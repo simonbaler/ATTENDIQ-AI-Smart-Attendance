@@ -1,0 +1,6 @@
+{
+  "name": "SITS SmartAttend AI",
+  "description": "Siddhartha Institute of Technology and Sciences - Production-Grade AI Face Recognition Institutional Attendance System for SIH 2026 with Pairwise Cross-Validation, Empirical Threshold Calibration, Temporal Confirmation, 8-Step Anti-Spoofing, and Disaster Recovery.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
