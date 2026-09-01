@@ -46,6 +46,87 @@ export interface Student {
   updated_at: string;
 }
 
+export interface DepartmentDef {
+  code: string;
+  name: string;
+  sections: string[];
+  subjects: string[];
+  classrooms: string[];
+}
+
+export const INSTITUTION_DEPARTMENTS: DepartmentDef[] = [
+  {
+    code: 'CSE',
+    name: 'Computer Science & Engineering',
+    sections: ['A', 'B', 'C', 'D'],
+    subjects: ['Machine Learning', 'Artificial Intelligence', 'Cloud Computing', 'Computer Networks', 'Operating Systems', 'Database Management Systems'],
+    classrooms: ['LH-301', 'LH-302', 'LH-303', 'CS-Lab-1', 'CS-Lab-2', 'Seminar Hall A', 'C-204'],
+  },
+  {
+    code: 'SE',
+    name: 'Software Engineering',
+    sections: ['A', 'B'],
+    subjects: ['Software Architecture', 'Agile Methodologies', 'Software Testing & QA', 'Cloud Systems & DevOps', 'Database Systems'],
+    classrooms: ['LH-204', 'C-204', 'SE-Lab-1', 'Seminar Hall A'],
+  },
+  {
+    code: 'ECE',
+    name: 'Electronics & Communication Engineering',
+    sections: ['A', 'B'],
+    subjects: ['VLSI Design', 'Digital Signal Processing', 'Embedded Systems', 'Microprocessors', 'Wireless Communications'],
+    classrooms: ['LH-201', 'LH-202', 'ECE-Lab-1', 'Seminar Hall B'],
+  },
+  {
+    code: 'AIML',
+    name: 'Artificial Intelligence & Machine Learning',
+    sections: ['A', 'B'],
+    subjects: ['Deep Learning', 'Natural Language Processing', 'Computer Vision', 'Reinforcement Learning', 'AI Ethics'],
+    classrooms: ['LH-401', 'LH-402', 'AI-Lab-1'],
+  },
+  {
+    code: 'DS',
+    name: 'Data Science',
+    sections: ['A', 'B'],
+    subjects: ['Big Data Analytics', 'Data Mining', 'Predictive Modeling', 'Data Visualization', 'Statistical Analysis'],
+    classrooms: ['LH-403', 'DS-Lab-1'],
+  },
+  {
+    code: 'EEE',
+    name: 'Electrical & Electronics Engineering',
+    sections: ['A'],
+    subjects: ['Power Systems', 'Control Systems', 'Electrical Machines', 'Renewable Energy'],
+    classrooms: ['LH-101', 'EEE-Lab-1'],
+  },
+  {
+    code: 'MECH',
+    name: 'Mechanical Engineering',
+    sections: ['A'],
+    subjects: ['Thermodynamics', 'Fluid Mechanics', 'CAD/CAM', 'Robotics & Automation'],
+    classrooms: ['LH-102', 'Mech-Workshop-1'],
+  },
+  {
+    code: 'CIVIL',
+    name: 'Civil Engineering',
+    sections: ['A'],
+    subjects: ['Structural Analysis', 'Geotechnical Engineering', 'Environmental Engineering', 'Surveying'],
+    classrooms: ['LH-103', 'Civil-Lab-1'],
+  },
+  {
+    code: 'IOT',
+    name: 'Internet of Things',
+    sections: ['A'],
+    subjects: ['Embedded Sensors', 'Wireless Sensor Networks', 'Edge AI', 'IoT Protocols'],
+    classrooms: ['LH-104', 'IoT-Lab-1'],
+  },
+  {
+    code: 'CSC',
+    name: 'Cyber Security',
+    sections: ['A'],
+    subjects: ['Network Security', 'Cryptography', 'Ethical Hacking', 'Digital Forensics'],
+    classrooms: ['LH-105', 'Cyber-Lab-1'],
+  },
+];
+
 export interface DepartmentRosterInfo {
   total: number;
   student_ids: string[];
@@ -745,6 +826,9 @@ export const db = {
     logs.push(newLog);
     writeJsonFile(AUDIT_FILE, logs);
   },
+
+  // Departments
+  getDepartments: (): DepartmentDef[] => INSTITUTION_DEPARTMENTS,
 
   // Settings
   getSettings: (): SystemSettings =>

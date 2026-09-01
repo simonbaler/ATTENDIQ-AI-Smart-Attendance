@@ -11,6 +11,18 @@ import {
 
 const API_BASE = '/api';
 
+async function safeJson<T = any>(res: Response, fallback: T): Promise<T> {
+  try {
+    const text = await res.text();
+    if (!text || text.trim().startsWith('<')) {
+      return fallback;
+    }
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('sits_token');
   return {
@@ -259,19 +271,40 @@ export const api = {
     return res.json();
   },
 
-  // Attendance
-  async getTodaySummary(): Promise<{ success: boolean; data: DashboardSummary }> {
-    const res = await fetch(`${API_BASE}/attendance/today`, {
+  async getSessionById(id: string): Promise<{
+    success: boolean;
+    session: AttendanceSession;
+    stats?: { total_students: number; present_count: number; absent_count: number; attendance_percentage: number };
+    department_stats?: Record<string, { department: string; total: number; present: number; absent: number; attendance_percentage: number }>;
+    absent_students?: Array<{ id: string; student_id: string; full_name: string; roll_number: string; department: string; section: string; status: 'ABSENT' }>;
+  }> {
+    const res = await fetch(`${API_BASE}/sessions/${id}`, {
       headers: getAuthHeaders(),
     });
     return res.json();
   },
 
+  // Attendance
+  async getTodaySummary(): Promise<{ success: boolean; data: DashboardSummary }> {
+    try {
+      const res = await fetch(`${API_BASE}/attendance/today`, {
+        headers: getAuthHeaders(),
+      });
+      return safeJson(res, { success: false, data: {} as DashboardSummary });
+    } catch {
+      return { success: false, data: {} as DashboardSummary };
+    }
+  },
+
   async getCommandCenterData(): Promise<{ success: boolean; data: import('../types').CommandCenterData }> {
-    const res = await fetch(`${API_BASE}/attendance/command-center`, {
-      headers: getAuthHeaders(),
-    });
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/attendance/command-center`, {
+        headers: getAuthHeaders(),
+      });
+      return safeJson(res, { success: false, data: null as any });
+    } catch {
+      return { success: false, data: null as any };
+    }
   },
 
   async getAttendance(params?: {

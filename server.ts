@@ -23,7 +23,7 @@ async function startServer() {
   await initDb();
 
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
   const server = http.createServer(app);
 
   // Mount WebRTC WebSocket Signaling Server
@@ -48,12 +48,12 @@ async function startServer() {
   app.use('/data/students', express.static(path.join(process.cwd(), 'data', 'students')));
 
   // Health check endpoint (public, unauthenticated)
-  app.get('/api/health', (req, res) => {
-    res.json({
+  app.get(['/health', '/api/health'], (req, res) => {
+    res.status(200).json({
       status: 'ok',
       system: 'ATTENDIQ AI — Smart Vision Attendance',
       institution: 'Siddhartha Institute of Technology and Sciences',
-      public_origin: 'https://ais-pre-bpayzufx5syjwygztm4y7l-460380840568.asia-southeast1.run.app',
+      public_origin: process.env.APP_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 'https://ais-pre-bpayzufx5syjwygztm4y7l-460380840568.asia-southeast1.run.app',
       version: '2.0.0',
       timestamp: new Date().toISOString(),
     });

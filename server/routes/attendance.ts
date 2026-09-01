@@ -13,171 +13,222 @@ const router = express.Router();
 
 // GET /api/attendance/command-center (Comprehensive AI Command Center 10 Status Cards + Live Activity Stream)
 router.get('/command-center', authenticateToken, (req, res) => {
-  const user = (req as any).user;
-  const effectiveDept = user.role === 'HOD' ? user.department : 'ALL';
-  const todayStr = new Date().toISOString().split('T')[0];
+  try {
+    const user = (req as any).user;
+    const effectiveDept = user.role === 'HOD' ? user.department : 'ALL';
+    const todayStr = new Date().toISOString().split('T')[0];
 
-  const allStudents = db.getStudents({
-    department: effectiveDept,
-    status: 'ACTIVE',
-  });
-
-  const registeredFacesCount = allStudents.filter((s) => s.face_registered).length;
-  const unregisteredFacesCount = allStudents.length - registeredFacesCount;
-
-  const todaySessions = db.getSessions({
-    department: effectiveDept,
-  }).filter((s) => s.date === todayStr);
-
-  const activeSessions = todaySessions.filter((s) => s.status === 'ACTIVE');
-
-  const todayAttendance = db.getAttendance({
-    department: effectiveDept,
-    date: todayStr,
-  });
-
-  const presentCount = todayAttendance.filter((r) => r.status === 'PRESENT').length;
-  const absentCount = Math.max(0, allStudents.length - presentCount);
-  const presentPct = allStudents.length > 0 ? Math.round((presentCount / allStudents.length) * 100) : 0;
-  const absentPct = allStudents.length > 0 ? 100 - presentPct : 0;
-
-  // Unknown people and recognition events
-  const recEvents = db.getRecognitionEvents ? db.getRecognitionEvents() : [];
-  const unknownRecCount = recEvents.filter((e: any) => e.result === 'UNKNOWN').length;
-
-  // Real recognition confidence average
-  const confidenceSum = todayAttendance.reduce((acc, curr) => acc + (curr.confidence || 0), 0);
-  const avgConfidence = todayAttendance.length > 0 ? Math.round((confidenceSum / todayAttendance.length) * 10) / 10 : 94.2;
-
-  // Cameras
-  const registeredCameras = db.getCameras({ department: effectiveDept });
-  const onlineCameras = registeredCameras.filter((c) => c.status === 'ONLINE');
-
-  // Audit Logs and Live Activity compilation
-  const auditLogs = db.getAuditLogs(30);
-  const liveActivity: Array<{
-    id: string;
-    type: string;
-    title: string;
-    description: string;
-    timestamp: string;
-    severity?: 'INFO' | 'SUCCESS' | 'WARNING' | 'ALERT';
-    metadata?: Record<string, any>;
-  }> = [];
-
-  // Map today's attendance to live activity
-  for (const att of todayAttendance.slice(0, 10)) {
-    liveActivity.push({
-      id: `act_${att.id}`,
-      type: 'ATTENDANCE_RECORDED',
-      title: `${att.full_name} (${att.roll_number}) Attendance Verified`,
-      description: `Marked PRESENT in ${att.subject || 'Classroom Session'} (${att.classroom || 'LH-301'}) with ${att.confidence || 95}% confidence via ${att.verification_method}.`,
-      timestamp: att.created_at || new Date().toISOString(),
-      severity: 'SUCCESS',
-      metadata: { roll: att.roll_number, dept: att.department, confidence: att.confidence },
+    const allStudents = db.getStudents({
+      department: effectiveDept,
+      status: 'ACTIVE',
     });
-  }
 
-  // Map audit logs to activity events
-  for (const log of auditLogs) {
-    if (log.action === 'GOOGLE_SHEETS_ROSTER_SYNC') {
+    const registeredFacesCount = allStudents.filter((s) => s.face_registered).length;
+    const unregisteredFacesCount = allStudents.length - registeredFacesCount;
+
+    const todaySessions = db.getSessions({
+      department: effectiveDept,
+    }).filter((s) => s.date === todayStr);
+
+    const activeSessions = todaySessions.filter((s) => s.status === 'ACTIVE');
+
+    const todayAttendance = db.getAttendance({
+      department: effectiveDept,
+      date: todayStr,
+    });
+
+    const presentCount = todayAttendance.filter((r) => r.status === 'PRESENT').length;
+    const absentCount = Math.max(0, allStudents.length - presentCount);
+    const presentPct = allStudents.length > 0 ? Math.round((presentCount / allStudents.length) * 100) : 0;
+    const absentPct = allStudents.length > 0 ? 100 - presentPct : 0;
+
+    // Unknown people and recognition events
+    const recEvents = db.getRecognitionEvents ? db.getRecognitionEvents() : [];
+    const unknownRecCount = recEvents.filter((e: any) => e.result === 'UNKNOWN').length;
+
+    // Real recognition confidence average
+    const confidenceSum = todayAttendance.reduce((acc, curr) => acc + (curr.confidence || 0), 0);
+    const avgConfidence = todayAttendance.length > 0 ? Math.round((confidenceSum / todayAttendance.length) * 10) / 10 : 94.2;
+
+    // Cameras
+    const registeredCameras = db.getCameras({ department: effectiveDept });
+    const onlineCameras = registeredCameras.filter((c) => c.status === 'ONLINE');
+
+    // Audit Logs and Live Activity compilation
+    const auditLogs = db.getAuditLogs(30);
+    const liveActivity: Array<{
+      id: string;
+      type: string;
+      title: string;
+      description: string;
+      timestamp: string;
+      severity?: 'INFO' | 'SUCCESS' | 'WARNING' | 'ALERT';
+      metadata?: Record<string, any>;
+    }> = [];
+
+    // Map today's attendance to live activity
+    for (const att of todayAttendance.slice(0, 10)) {
       liveActivity.push({
-        id: `act_${log.id}`,
-        type: 'GOOGLE_SHEET_SYNC',
-        title: 'Google Sheets Roster Synchronized',
-        description: log.details || 'Authoritative student roster synchronized successfully.',
-        timestamp: log.timestamp,
+        id: `act_${att.id}`,
+        type: 'ATTENDANCE_RECORDED',
+        title: `${att.full_name} (${att.roll_number}) Attendance Verified`,
+        description: `Marked PRESENT in ${att.subject || 'Classroom Session'} (${att.classroom || 'LH-301'}) with ${att.confidence || 95}% confidence via ${att.verification_method}.`,
+        timestamp: att.created_at || new Date().toISOString(),
         severity: 'SUCCESS',
-      });
-    } else if (log.action === 'CAMERA_PAIRING_REQUEST' || log.action === 'MOBILE_CAMERA_CONNECTED') {
-      liveActivity.push({
-        id: `act_${log.id}`,
-        type: 'CAMERA_CONNECTED',
-        title: 'Mobile Camera WebRTC Connected',
-        description: log.details || 'Classroom smartphone video feed connected.',
-        timestamp: log.timestamp,
-        severity: 'INFO',
-      });
-    } else if (log.action === 'MOBILE_CAMERA_DISCONNECTED') {
-      liveActivity.push({
-        id: `act_${log.id}`,
-        type: 'CAMERA_DISCONNECTED',
-        title: 'Camera Feed Disconnected',
-        description: log.details || 'Camera connection closed.',
-        timestamp: log.timestamp,
-        severity: 'WARNING',
-      });
-    } else if (log.action === 'SECURITY_EVENT_FLAGGED') {
-      liveActivity.push({
-        id: `act_${log.id}`,
-        type: 'UNKNOWN_PERSON',
-        title: 'Unknown Person Detected',
-        description: log.details || 'Un-enrolled face detected in classroom frame.',
-        timestamp: log.timestamp,
-        severity: 'ALERT',
+        metadata: { roll: att.roll_number, dept: att.department, confidence: att.confidence },
       });
     }
+
+    // Map audit logs to activity events
+    for (const log of auditLogs) {
+      if (log.action === 'GOOGLE_SHEETS_ROSTER_SYNC') {
+        liveActivity.push({
+          id: `act_${log.id}`,
+          type: 'GOOGLE_SHEET_SYNC',
+          title: 'Google Sheets Roster Synchronized',
+          description: log.details || 'Authoritative student roster synchronized successfully.',
+          timestamp: log.timestamp,
+          severity: 'SUCCESS',
+        });
+      } else if (log.action === 'CAMERA_PAIRING_REQUEST' || log.action === 'MOBILE_CAMERA_CONNECTED') {
+        liveActivity.push({
+          id: `act_${log.id}`,
+          type: 'CAMERA_CONNECTED',
+          title: 'Mobile Camera WebRTC Connected',
+          description: log.details || 'Classroom smartphone video feed connected.',
+          timestamp: log.timestamp,
+          severity: 'INFO',
+        });
+      } else if (log.action === 'MOBILE_CAMERA_DISCONNECTED') {
+        liveActivity.push({
+          id: `act_${log.id}`,
+          type: 'CAMERA_DISCONNECTED',
+          title: 'Camera Feed Disconnected',
+          description: log.details || 'Camera connection closed.',
+          timestamp: log.timestamp,
+          severity: 'WARNING',
+        });
+      } else if (log.action === 'SECURITY_EVENT_FLAGGED') {
+        liveActivity.push({
+          id: `act_${log.id}`,
+          type: 'UNKNOWN_PERSON',
+          title: 'Unknown Person Detected',
+          description: log.details || 'Un-enrolled face detected in classroom frame.',
+          timestamp: log.timestamp,
+          severity: 'ALERT',
+        });
+      }
+    }
+
+    // Sort activity descending by timestamp
+    liveActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    // Department stats calculation
+    const allDepts = typeof db.getDepartments === 'function' ? db.getDepartments() : [];
+    const deptStats: Record<string, {
+      department: string;
+      total: number;
+      present: number;
+      absent: number;
+      attendance_percentage: number;
+    }> = {};
+
+    allDepts.forEach((d) => {
+      const deptStudents = db.getStudents({ department: d.name, status: 'ACTIVE' });
+      const deptAttendance = todayAttendance.filter((r) => r.department === d.name);
+      const dPresent = deptAttendance.filter((r) => r.status === 'PRESENT').length;
+      const dAbsent = Math.max(0, deptStudents.length - dPresent);
+      const dPct = deptStudents.length > 0 ? Math.round((dPresent / deptStudents.length) * 100) : 0;
+
+      deptStats[d.name] = {
+        department: d.name,
+        total: deptStudents.length,
+        present: dPresent,
+        absent: dAbsent,
+        attendance_percentage: dPct,
+      };
+    });
+
+    // Department Insights
+    const activeDeptsWithStudents = Object.values(deptStats).filter((s) => s.total > 0);
+    let highestDept: { name: string; percentage: number } | null = null;
+    let lowestDept: { name: string; percentage: number } | null = null;
+
+    if (activeDeptsWithStudents.length > 0) {
+      const sorted = [...activeDeptsWithStudents].sort((a, b) => b.attendance_percentage - a.attendance_percentage);
+      highestDept = { name: sorted[0].department, percentage: sorted[0].attendance_percentage };
+      lowestDept = { name: sorted[sorted.length - 1].department, percentage: sorted[sorted.length - 1].attendance_percentage };
+    }
+
+    res.json({
+      success: true,
+      data: {
+        live_attendance: {
+          status: activeSessions.length > 0 ? 'ACTIVE' : 'IDLE',
+          active_sessions_count: activeSessions.length,
+          total_markings_today: todayAttendance.length,
+          active_session_name: activeSessions[0]?.subject || 'No Active Session',
+        },
+        students_present: {
+          count: presentCount,
+          percentage: presentPct,
+        },
+        students_absent: {
+          count: absentCount,
+          percentage: absentPct,
+        },
+        unknown_people: {
+          count: unknownRecCount,
+          recent_events_count: unknownRecCount,
+        },
+        recognition_confidence: {
+          average_confidence: avgConfidence,
+          model: 'FaceRecognitionNet (SSD MobileNet V1)',
+          dimension: '128D L2-Normalized',
+        },
+        connected_cameras: {
+          count: Math.max(1, onlineCameras.length),
+          online_count: Math.max(1, onlineCameras.length),
+          sources: ['Laptop HD Webcam', 'Mobile WebRTC Camera', 'RTSP Classroom Camera'],
+        },
+        camera_health: {
+          status: 'HEALTHY',
+          avg_fps: 30,
+          avg_latency_ms: 28,
+        },
+        google_sheet_health: {
+          status: allStudents.length > 0 ? 'SYNCHRONIZED' : 'NEEDS_SYNC',
+          total_students: allStudents.length,
+          biometric_ready_count: registeredFacesCount,
+          last_synced_at: auditLogs.find((l) => l.action === 'GOOGLE_SHEETS_ROSTER_SYNC')?.timestamp || 'Active Roster',
+        },
+        ai_agent_status: {
+          status: 'ONLINE',
+          engine: '128D FaceNet + Voice Agent',
+          vector_search: 'Active (Exact Cosine/Euclidean)',
+          llm_interpreter: 'Groq + DeepSeek Server Proxy',
+        },
+        sensor_status: {
+          status: 'NO SENSOR CONNECTED',
+          connected_count: 0,
+          gateway: 'Web Bluetooth & ESP32 Standby',
+        },
+        department_stats: deptStats,
+        department_insights: {
+          highest_attendance_department: highestDept,
+          lowest_attendance_department: lowestDept,
+          low_attendance_warnings: activeDeptsWithStudents.filter((s) => s.attendance_percentage < 75).map((s) => s.department),
+        },
+        live_activity: liveActivity.slice(0, 15),
+      },
+    });
+  } catch (err: any) {
+    console.error('Error in command-center endpoint:', err);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Internal server error while loading command center data.',
+    });
   }
-
-  // Sort activity descending by timestamp
-  liveActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-  res.json({
-    success: true,
-    data: {
-      live_attendance: {
-        status: activeSessions.length > 0 ? 'ACTIVE' : 'IDLE',
-        active_sessions_count: activeSessions.length,
-        total_markings_today: todayAttendance.length,
-        active_session_name: activeSessions[0]?.subject || 'No Active Session',
-      },
-      students_present: {
-        count: presentCount,
-        percentage: presentPct,
-      },
-      students_absent: {
-        count: absentCount,
-        percentage: absentPct,
-      },
-      unknown_people: {
-        count: unknownRecCount,
-        recent_events_count: unknownRecCount,
-      },
-      recognition_confidence: {
-        average_confidence: avgConfidence,
-        model: 'FaceRecognitionNet (SSD MobileNet V1)',
-        dimension: '128D L2-Normalized',
-      },
-      connected_cameras: {
-        count: Math.max(1, onlineCameras.length),
-        online_count: Math.max(1, onlineCameras.length),
-        sources: ['Laptop HD Webcam', 'Mobile WebRTC Camera', 'RTSP Classroom Camera'],
-      },
-      camera_health: {
-        status: 'HEALTHY',
-        avg_fps: 30,
-        avg_latency_ms: 28,
-      },
-      google_sheet_health: {
-        status: allStudents.length > 0 ? 'SYNCHRONIZED' : 'NEEDS_SYNC',
-        total_students: allStudents.length,
-        biometric_ready_count: registeredFacesCount,
-        last_synced_at: auditLogs.find((l) => l.action === 'GOOGLE_SHEETS_ROSTER_SYNC')?.timestamp || 'Active Roster',
-      },
-      ai_agent_status: {
-        status: 'ONLINE',
-        engine: '128D FaceNet + Voice Agent',
-        vector_search: 'Active (Exact Cosine/Euclidean)',
-        llm_interpreter: 'Groq + DeepSeek Server Proxy',
-      },
-      sensor_status: {
-        status: 'NO SENSOR CONNECTED',
-        connected_count: 0,
-        gateway: 'Web Bluetooth & ESP32 Standby',
-      },
-      live_activity: liveActivity.slice(0, 15),
-    },
-  });
 });
 
 // GET /api/attendance/today (Summary statistics for dashboard cards)
@@ -524,47 +575,63 @@ router.get('/export', authenticateToken, (req, res) => {
   });
 
   const headers = [
-    'Student ID',
-    'Full Name',
     'Roll Number',
+    'Student Name',
     'Department',
-    'Section',
-    'Subject',
+    'Session',
     'Classroom',
+    'Subject',
     'Date',
     'Time',
-    'Status',
-    'Confidence (%)',
+    'Attendance Status',
+    'Recognition Confidence',
     'Verification Method',
     'Marked By',
-    'Notes',
   ];
 
   const csvRows: string[] = [headers.join(',')];
 
+  const sessionObj = session_id ? db.getSessionById(session_id) : null;
+  const sessionName = sessionObj ? `${sessionObj.subject} (${sessionObj.date} ${sessionObj.start_time})` : 'Regular Session';
+
   records.forEach((r) => {
-    const student = db.getStudentById(r.student_id);
     const row = [
-      `"${student?.student_id || r.student_id}"`,
-      `"${r.full_name.replace(/"/g, '""')}"`,
       `"${r.roll_number}"`,
+      `"${r.full_name.replace(/"/g, '""')}"`,
       `"${r.department}"`,
-      `"${r.section}"`,
-      `"${r.subject || 'N/A'}"`,
-      `"${r.classroom || 'N/A'}"`,
+      `"${sessionName.replace(/"/g, '""')}"`,
+      `"${r.classroom || sessionObj?.classroom || 'N/A'}"`,
+      `"${r.subject || sessionObj?.subject || 'N/A'}"`,
       `"${r.date}"`,
       `"${r.time}"`,
       `"${r.status}"`,
       `"${r.confidence}%"`,
       `"${r.verification_method}"`,
       `"${r.marked_by || 'SYSTEM'}"`,
-      `"${(r.notes || '').replace(/"/g, '""')}"`,
     ];
     csvRows.push(row.join(','));
   });
 
+  // If exporting a specific session, append department breakdown summary
+  if (sessionObj) {
+    csvRows.push('');
+    csvRows.push('"--- DEPARTMENT ATTENDANCE SUMMARY ---"');
+    csvRows.push('"Department","Total Roster","Present","Absent","Attendance Percentage"');
+
+    const stats = sessionObj.department_stats || {};
+    Object.entries(stats).forEach(([deptName, s]: [string, any]) => {
+      csvRows.push(`"${deptName}","${s.total}","${s.present}","${s.absent}","${s.attendance_percentage}%"`);
+    });
+
+    const totalStudents = sessionObj.roster_snapshot?.total_students || 0;
+    const totalPresent = records.filter((r) => r.status === 'PRESENT').length;
+    const totalAbsent = Math.max(0, totalStudents - totalPresent);
+    const overallPct = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+    csvRows.push(`"OVERALL TOTAL","${totalStudents}","${totalPresent}","${totalAbsent}","${overallPct}%"`);
+  }
+
   const csvContent = csvRows.join('\r\n');
-  const filename = `SITS_Attendance_${effectiveDept || 'All'}_${date || new Date().toISOString().split('T')[0]}.csv`;
+  const filename = `ATTENDIQ_${sessionObj?.is_multi_department ? 'MultiDept_' : ''}${effectiveDept || 'All'}_${date || new Date().toISOString().split('T')[0]}.csv`;
 
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

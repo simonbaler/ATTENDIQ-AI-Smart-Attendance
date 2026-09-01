@@ -23,6 +23,9 @@ import {
   QrCode,
   Check,
   ExternalLink,
+  Building2,
+  BarChart3,
+  Filter,
 } from 'lucide-react';
 import { CommandCenterData, LiveActivityEvent } from '../types';
 import { api } from '../services/api';
@@ -44,9 +47,10 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
   onOpenSheetsSync,
 }) => {
   const { user, isAdmin } = useAuth();
-  const [commandData, setCommandData] = useState<CommandCenterData | null>(null);
+  const [commandData, setCommandData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
 
   const fetchCommandData = async () => {
     try {
@@ -75,6 +79,44 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
 
   const isLive = commandData?.live_attendance.status === 'ACTIVE';
 
+  const getDeptShortCode = (name: string) => {
+    return name
+      .replace('Computer Science & Engineering', 'CSE')
+      .replace('Software Engineering', 'SE')
+      .replace('Electrical & Electronics Engineering', 'EEE')
+      .replace('Electronics & Communication Engineering', 'ECE')
+      .replace('Artificial Intelligence & Machine Learning', 'AIML')
+      .replace('Data Science', 'DS')
+      .replace('Internet of Things', 'IOT')
+      .replace('Mechanical Engineering', 'MECH')
+      .replace('Civil Engineering', 'CIVIL')
+      .replace('Cyber Security', 'CSC');
+  };
+
+  // Department list and filters
+  const deptStatsObj = commandData?.department_stats || {};
+  const allDeptKeys = Object.keys(deptStatsObj);
+
+  const filteredDeptKeys = allDeptKeys.filter((deptName) => {
+    if (selectedDeptFilter === 'ALL') return true;
+    const shortCode = getDeptShortCode(deptName).toLowerCase();
+    const filterLower = selectedDeptFilter.toLowerCase();
+    return shortCode.includes(filterLower) || deptName.toLowerCase().includes(filterLower);
+  });
+
+  const departmentFilterOptions = [
+    { label: 'All Departments', value: 'ALL' },
+    { label: 'CSE', value: 'CSE' },
+    { label: 'SE', value: 'SE' },
+    { label: 'EEE', value: 'EEE' },
+    { label: 'AIML', value: 'AIML' },
+    { label: 'ECE', value: 'ECE' },
+    { label: 'CIVIL', value: 'CIVIL' },
+    { label: 'MECH', value: 'MECH' },
+    { label: 'IOT', value: 'IOT' },
+    { label: 'CSC', value: 'CSC' },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Command Center Hero & System Status */}
@@ -86,7 +128,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold border border-blue-500/20">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>AI COMMAND CENTER — PHASE 7</span>
+                <span>AI COMMAND CENTER — MULTI-DEPARTMENT INTELLIGENCE</span>
               </div>
 
               <div
@@ -109,7 +151,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
               {isAdmin ? 'Institutional AI Attendance Command Center' : `${user?.department} — Live Attendance Command`}
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 max-w-3xl leading-relaxed">
-              Real-time multi-face biometric tracking, 128D neural verification, Google Sheets authoritative sync, and zero synthetic data enforcement.
+              Real-time multi-department classroom attendance, 128D neural verification, Google Sheets authoritative roster sync, and live department-wise intelligence counters.
             </p>
           </div>
 
@@ -350,7 +392,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
           </div>
           <div className="mt-3">
             <div className="text-xl font-black text-white flex items-center space-x-1.5">
-              <span>{commandData?.google_sheet_health.status || 'SYNCED'}</span>
+              <span>{commandData?.google_sheet_health.status || 'SYNCHRONIZED'}</span>
             </div>
             <p className="text-[11px] text-slate-400 mt-1 truncate">
               {commandData?.google_sheet_health.total_students ?? 0} Students in Roster
@@ -385,25 +427,182 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
           </div>
         </div>
 
-        {/* Card 10: Sensor Status */}
+        {/* Card 10: Participating Departments */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">10. Sensor Status</span>
-            <div className="p-1.5 rounded-lg bg-slate-800 text-slate-400 border border-slate-700">
-              <Radio className="w-4 h-4" />
+            <span className="text-xs font-bold text-slate-400">10. Departments</span>
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Building2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-tight">
-              {commandData?.sensor_status.status || 'NO SENSOR CONNECTED'}
+            <div className="text-2xl font-black text-white">
+              {allDeptKeys.length || 10}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1 truncate">
-              BLE & Telemetry Gateway
+            <p className="text-[11px] text-slate-400 mt-1 truncate">
+              Google Sheet Synchronized
             </p>
-            <div className="mt-2 text-[10px] text-slate-500 font-mono">
-              0 hardware devices paired
+            <div className="mt-2 text-[10px] text-emerald-400 font-mono">
+              Multi-Dept Roster Ready
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Real-Time Department Attendance Dashboard & Intelligence */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <div className="flex items-center space-x-2">
+              <BarChart3 className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                Real-Time Department Attendance Intelligence
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Authoritative Google Sheet student breakdown per department with live turnout percentages.
+            </p>
+          </div>
+
+          {/* Department Filter Tabs */}
+          <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 max-w-full">
+            {departmentFilterOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setSelectedDeptFilter(opt.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
+                  selectedDeptFilter === opt.value
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Department Comparison Insights Badges */}
+        {commandData?.department_insights && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {commandData.department_insights.highest_attendance_department && (
+              <div className="bg-emerald-950/40 border border-emerald-800/40 rounded-xl p-3 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div>
+                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Highest Attendance</span>
+                    <p className="text-xs font-bold text-white truncate max-w-[150px]">
+                      {commandData.department_insights.highest_attendance_department.name}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-sm font-mono font-black text-emerald-400">
+                  {commandData.department_insights.highest_attendance_department.percentage}%
+                </span>
+              </div>
+            )}
+
+            {commandData.department_insights.lowest_attendance_department && (
+              <div className="bg-amber-950/40 border border-amber-800/40 rounded-xl p-3 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div>
+                    <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Lowest Turnout</span>
+                    <p className="text-xs font-bold text-white truncate max-w-[150px]">
+                      {commandData.department_insights.lowest_attendance_department.name}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-sm font-mono font-black text-amber-400">
+                  {commandData.department_insights.lowest_attendance_department.percentage}%
+                </span>
+              </div>
+            )}
+
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <ShieldAlert className="w-4 h-4 text-blue-400 shrink-0" />
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Compliance Threshold</span>
+                  <p className="text-xs font-bold text-white">75% Institutional Minimum</p>
+                </div>
+              </div>
+              <span className="text-xs font-mono font-bold text-blue-400">Enforced</span>
+            </div>
+          </div>
+        )}
+
+        {/* Department Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {filteredDeptKeys.length === 0 ? (
+            <div className="col-span-full py-8 text-center text-slate-500">
+              <Building2 className="w-6 h-6 mx-auto mb-2 opacity-40" />
+              <span>No department found matching "{selectedDeptFilter}".</span>
+            </div>
+          ) : (
+            filteredDeptKeys.map((deptName) => {
+              const stat = deptStatsObj[deptName] || {
+                department: deptName,
+                total: 0,
+                present: 0,
+                absent: 0,
+                attendance_percentage: 0,
+              };
+              const shortCode = getDeptShortCode(deptName);
+              const isHigh = stat.attendance_percentage >= 80;
+              const isLow = stat.attendance_percentage < 60;
+
+              return (
+                <div
+                  key={deptName}
+                  className="bg-slate-950/70 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 space-y-2.5 transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono font-bold text-emerald-300">
+                        {shortCode}
+                      </span>
+                      <span className="text-xs font-semibold text-white truncate max-w-[130px]">
+                        {deptName}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-xs font-mono font-black ${
+                        isHigh ? 'text-emerald-400' : isLow ? 'text-rose-400' : 'text-amber-400'
+                      }`}
+                    >
+                      {stat.attendance_percentage}%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1 text-[11px] pt-1 border-t border-slate-900">
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">Total</span>
+                      <span className="font-mono text-slate-200 font-bold">{stat.total}</span>
+                    </div>
+                    <div>
+                      <span className="text-emerald-500/80 block text-[10px]">Present</span>
+                      <span className="font-mono text-emerald-400 font-bold">{stat.present}</span>
+                    </div>
+                    <div>
+                      <span className="text-rose-500/80 block text-[10px]">Absent</span>
+                      <span className="font-mono text-rose-400 font-bold">{stat.absent}</span>
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isHigh ? 'bg-emerald-500' : isLow ? 'bg-rose-500' : 'bg-amber-500'
+                      }`}
+                      style={{ width: `${Math.min(100, stat.attendance_percentage)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -425,7 +624,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
 
           {commandData?.live_activity && commandData.live_activity.length > 0 ? (
             <div className="divide-y divide-slate-800 max-h-[380px] overflow-y-auto pr-1">
-              {commandData.live_activity.map((event) => (
+              {commandData.live_activity.map((event: any) => (
                 <div key={event.id} className="py-3 flex items-start justify-between space-x-3 text-xs">
                   <div className="flex items-start space-x-3">
                     <div
@@ -561,3 +760,4 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
     </div>
   );
 };
+

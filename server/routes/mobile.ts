@@ -33,29 +33,18 @@ function getLocalNetworkIp(): string | null {
   return null;
 }
 
-// Helper function to resolve reachable origin (Strict AI Studio & Localhost filtering + Public Cloud Run auto-rewrite)
+// Helper function to resolve reachable origin according to strict production priority
 function resolveReachableOrigin(req: express.Request, clientOrigin?: string): { baseOrigin: string; isLocalhost: boolean; lanIp: string | null; isAiStudioPreview: boolean } {
   const lanIp = getLocalNetworkIp();
   const forwardedHost = req.get('x-forwarded-host');
+  const forwardedProto = req.get('x-forwarded-proto');
   const headerHost = req.get('host') || 'localhost:3000';
-  const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+  const isHttps = req.protocol === 'https' || forwardedProto === 'https' || process.env.NODE_ENV === 'production';
+  const protocol = isHttps ? 'https' : 'http';
   const settings = db.getSettings();
 
-  // Known public preview URL for this project (unauthenticated, public access)
+  // Known fallback public preview URL for AI Studio development container
   const PUBLIC_PREVIEW_URL = 'https://ais-pre-bpayzufx5syjwygztm4y7l-460380840568.asia-southeast1.run.app';
-
-  const normalizeOrigin = (url?: string | null): string | null => {
-    if (!url || typeof url !== 'string') return null;
-    let clean = url.trim().replace(/\/$/, '');
-    // If the origin is the internal development preview (ais-dev-) or aistudio iframe, rewrite to public preview
-    if (clean.includes('ais-dev-') && clean.includes('.run.app')) {
-      clean = clean.replace('ais-dev-', 'ais-pre-');
-    }
-    if (clean.includes('aistudio.google.com') || clean.includes('localhost') || clean.includes('127.0.0.1')) {
-      return PUBLIC_PREVIEW_URL;
-    }
-    return clean;
-  };
 
   const isBadOrigin = (url?: string | null): boolean => {
     if (!url || typeof url !== 'string') return true;
@@ -69,46 +58,67 @@ function resolveReachableOrigin(req: express.Request, clientOrigin?: string): { 
     );
   };
 
+  const cleanUrl = (url?: string | null): string | null => {
+    if (!url || typeof url !== 'string') return null;
+    let clean = url.trim().replace(/\/$/, '');
+    if (clean.includes('ais-dev-') && clean.includes('.run.app')) {
+      clean = clean.replace('ais-dev-', 'ais-pre-');
+    }
+    // In production or on Render/Cloud Run, always upgrade http to https
+    if ((process.env.NODE_ENV === 'production' || process.env.RENDER || process.env.RENDER_EXTERNAL_URL) && clean.startsWith('http://') && !clean.includes('localhost') && !clean.includes('127.0.0.1')) {
+      clean = clean.replace('http://', 'https://');
+    }
+    return clean;
+  };
+
   let baseOrigin = '';
 
-  // Priority 1: Persisted DB System Settings (APP_PUBLIC_URL, DEV_PUBLIC_ORIGIN, DEV_LAN_ORIGIN)
-  const settingsUrl = normalizeOrigin(settings.app_public_url || settings.dev_public_origin || settings.dev_lan_origin);
-  if (settingsUrl && !isBadOrigin(settingsUrl)) {
-    baseOrigin = settingsUrl;
-  }
-  // Priority 2: Configured Environment URLs
-  else if (process.env.APP_PUBLIC_URL) {
-    const envUrl = normalizeOrigin(process.env.APP_PUBLIC_URL);
+  // Priority 1: Configured APP_PUBLIC_URL environment variable
+  if (process.env.APP_PUBLIC_URL) {
+    const envUrl = cleanUrl(process.env.APP_PUBLIC_URL);
     if (envUrl && !isBadOrigin(envUrl)) baseOrigin = envUrl;
-  } else if (process.env.DEV_PUBLIC_ORIGIN) {
-    const envDev = normalizeOrigin(process.env.DEV_PUBLIC_ORIGIN);
-    if (envDev && !isBadOrigin(envDev)) baseOrigin = envDev;
   }
-  // Priority 3: Client browser origin rewritten from ais-dev to ais-pre
-  else if (clientOrigin) {
-    const normClient = normalizeOrigin(clientOrigin);
-    if (normClient && !isBadOrigin(normClient)) {
-      baseOrigin = normClient;
-    }
+  // Priority 2: RENDER_EXTERNAL_URL (automatically provided by Render deployment)
+  if (!baseOrigin && process.env.RENDER_EXTERNAL_URL) {
+    const envRender = cleanUrl(process.env.RENDER_EXTERNAL_URL);
+    if (envRender && !isBadOrigin(envRender)) baseOrigin = envRender;
   }
-  // Priority 4: Forwarded host header from reverse proxies / Cloud Run rewritten from ais-dev to ais-pre
-  else if (forwardedHost) {
-    const normFwd = normalizeOrigin(`${protocol}://${forwardedHost}`);
+  // Priority 3: Incoming request HTTPS origin (from reverse proxy / host headers)
+  if (!baseOrigin && forwardedHost) {
+    const normFwd = cleanUrl(`${protocol}://${forwardedHost}`);
     if (normFwd && !isBadOrigin(normFwd)) {
       baseOrigin = normFwd;
     }
   }
-  // Priority 5: Direct headerHost if not localhost or AI Studio
-  else if (headerHost) {
-    const normHost = normalizeOrigin(`${protocol}://${headerHost}`);
+  if (!baseOrigin && headerHost && !isBadOrigin(headerHost)) {
+    const normHost = cleanUrl(`${protocol}://${headerHost}`);
     if (normHost && !isBadOrigin(normHost)) {
       baseOrigin = normHost;
     }
   }
+  // Priority 4: Persisted DB System Settings
+  if (!baseOrigin) {
+    const settingsUrl = cleanUrl(settings.app_public_url || settings.dev_public_origin);
+    if (settingsUrl && !isBadOrigin(settingsUrl)) {
+      baseOrigin = settingsUrl;
+    }
+  }
+  // Priority 5: Client browser origin if valid and not aistudio internal
+  if (!baseOrigin && clientOrigin) {
+    const normClient = cleanUrl(clientOrigin);
+    if (normClient && !isBadOrigin(normClient)) {
+      baseOrigin = normClient;
+    }
+  }
 
-  // If still empty or unresolved or contains dev/aistudio, fallback to known public preview origin
+  // Fallback for AI Studio preview or LAN development
   if (!baseOrigin || isBadOrigin(baseOrigin) || baseOrigin.includes('ais-dev-')) {
     baseOrigin = PUBLIC_PREVIEW_URL;
+  }
+
+  // Ensure production origin always starts with https://
+  if (process.env.NODE_ENV === 'production' && baseOrigin.startsWith('http://') && !baseOrigin.includes('localhost') && !baseOrigin.includes('127.0.0.1')) {
+    baseOrigin = baseOrigin.replace('http://', 'https://');
   }
 
   const isLocalhost = baseOrigin.includes('localhost') || baseOrigin.includes('127.0.0.1');

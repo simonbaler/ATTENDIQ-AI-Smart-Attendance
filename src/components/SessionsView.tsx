@@ -10,11 +10,14 @@ import {
   Users,
   CheckCircle2,
   AlertCircle,
+  BarChart3,
+  UserX,
 } from 'lucide-react';
-import { AttendanceSession, DepartmentInfo } from '../types';
+import { AttendanceSession, DepartmentInfo, DepartmentSessionStat } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { SessionModal } from './SessionModal';
+import { SessionSummaryModal } from './SessionSummaryModal';
 
 interface SessionsViewProps {
   departments: DepartmentInfo[];
@@ -26,6 +29,18 @@ export const SessionsView: React.FC<SessionsViewProps> = ({ departments, onOpenL
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
+
+  // Summary Modal state
+  const [selectedSummarySession, setSelectedSummarySession] = useState<AttendanceSession | null>(null);
+  const [summaryDeptStats, setSummaryDeptStats] = useState<Record<string, DepartmentSessionStat>>({});
+  const [summaryAbsentees, setSummaryAbsentees] = useState<any[]>([]);
+  const [summaryOverallStats, setSummaryOverallStats] = useState<{
+    total_students: number;
+    present_count: number;
+    absent_count: number;
+    attendance_percentage: number;
+  } | undefined>(undefined);
+  const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -47,11 +62,29 @@ export const SessionsView: React.FC<SessionsViewProps> = ({ departments, onOpenL
     fetchSessions();
   }, []);
 
+  const openSessionSummary = async (session: AttendanceSession) => {
+    try {
+      const res = await api.getSessionById(session.id);
+      if (res.success) {
+        setSelectedSummarySession(res.session);
+        setSummaryDeptStats(res.department_stats || res.session.department_stats || {});
+        setSummaryAbsentees(res.absent_students || []);
+        setSummaryOverallStats(res.stats);
+        setShowSummaryModal(true);
+      }
+    } catch (err) {
+      console.error('Failed to fetch session summary:', err);
+    }
+  };
+
   const handleStopSession = async (id: string) => {
     try {
       const res = await api.stopSession(id);
       if (res.success) {
         fetchSessions();
+        if (res.session) {
+          openSessionSummary(res.session);
+        }
       }
     } catch (err) {
       console.error('Failed to stop session:', err);
@@ -191,14 +224,33 @@ export const SessionsView: React.FC<SessionsViewProps> = ({ departments, onOpenL
                   </div>
                 </div>
 
-                {isActive && onOpenLiveCamera && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
-                    onClick={onOpenLiveCamera}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg shadow transition flex items-center justify-center space-x-2"
+                    onClick={() => openSessionSummary(s)}
+                    className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition flex items-center justify-center space-x-1.5"
                   >
-                    <span>Open Live Attendance Camera</span>
+                    <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Summary & Absentees</span>
                   </button>
-                )}
+
+                  {isActive && onOpenLiveCamera ? (
+                    <button
+                      onClick={onOpenLiveCamera}
+                      className="py-1.5 px-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg shadow transition flex items-center justify-center space-x-1.5"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Live Camera</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => openSessionSummary(s)}
+                      className="py-1.5 px-2 bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg text-xs font-medium border border-slate-800 transition flex items-center justify-center space-x-1.5"
+                    >
+                      <UserX className="w-3.5 h-3.5 text-rose-400" />
+                      <span>View Absentees</span>
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })
@@ -213,6 +265,15 @@ export const SessionsView: React.FC<SessionsViewProps> = ({ departments, onOpenL
           if (onOpenLiveCamera) onOpenLiveCamera();
         }}
         departments={departments}
+      />
+
+      <SessionSummaryModal
+        isOpen={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        session={selectedSummarySession}
+        departmentStats={summaryDeptStats}
+        absentStudents={summaryAbsentees}
+        overallStats={summaryOverallStats}
       />
     </div>
   );
