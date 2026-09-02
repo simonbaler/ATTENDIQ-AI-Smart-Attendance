@@ -13,7 +13,9 @@ import intelligenceRouter from './server/routes/intelligence.js';
 import validationRouter from './server/routes/validation.js';
 import mobileRouter from './server/routes/mobile.js';
 import camerasRouter from './server/routes/cameras.js';
-import { setupSignalingServer } from './server/signaling.js';
+import devicesRouter from './server/routes/devices.js';
+import { createSignalingServer } from './server/signaling.js';
+import { createIoTGatewayServer } from './server/iotGateway.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,8 +28,33 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
   const server = http.createServer(app);
 
-  // Mount WebRTC WebSocket Signaling Server
-  setupSignalingServer(server);
+  // Initialize WebSocket Servers with noServer mode
+  const signalingWss = createSignalingServer();
+  const iotWss = createIoTGatewayServer();
+
+  // Dispatch HTTP upgrade events based on URL path
+  server.on('upgrade', (request, socket, head) => {
+    const { pathname } = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+
+    if (pathname.startsWith('/api/mobile/signaling')) {
+      signalingWss.handleUpgrade(request, socket, head, (ws) => {
+        signalingWss.emit('connection', ws, request);
+      });
+    } else if (
+      pathname.startsWith('/api/devices/ws') ||
+      pathname.startsWith('/api/devices/stream') ||
+      pathname.startsWith('/api/iot')
+    ) {
+      iotWss.handleUpgrade(request, socket, head, (ws) => {
+        iotWss.emit('connection', ws, request);
+      });
+    } else {
+      // Let Vite HMR or other handlers take over if in dev mode, or destroy socket
+      if (process.env.NODE_ENV === 'production') {
+        socket.destroy();
+      }
+    }
+  });
 
   // CORS middleware for public mobile pairing and API access
   app.use((req, res, next) => {
@@ -69,6 +96,7 @@ async function startServer() {
   app.use('/api/system', validationRouter);
   app.use('/api/mobile', mobileRouter);
   app.use('/api/cameras', camerasRouter);
+  app.use('/api/devices', devicesRouter);
   app.use('/api', intelligenceRouter);
   app.use('/api', settingsRouter);
 

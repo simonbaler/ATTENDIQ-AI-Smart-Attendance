@@ -120,11 +120,62 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       reply = 'Camera session disconnected. Video feed stopped.';
     } else if (lower.includes('camera status') || lower.includes('show camera status')) {
       reply = 'Camera subsystem is operating at 30 frames per second with 28 millisecond latency.';
-    } else if (lower.includes('how many are absent') || lower.includes('absent count') || lower.includes('absent students')) {
+    } else if (lower.includes('how many cse') || lower.includes('cse present') || lower.includes('cse students present')) {
+      try {
+        const sessionRes = await api.getActiveSession();
+        if (sessionRes.success && sessionRes.session?.department_stats) {
+          const cseKey = Object.keys(sessionRes.session.department_stats).find(k => k.toLowerCase().includes('computer') || k.toLowerCase().includes('cse'));
+          if (cseKey) {
+            const stat = sessionRes.session.department_stats[cseKey];
+            reply = `In the active session, ${stat.present} out of ${stat.total} Computer Science students are present (${stat.attendance_percentage} percent).`;
+          } else {
+            reply = 'No CSE students recorded in active multi-department session yet.';
+          }
+        } else {
+          reply = 'Active session department counts are updated dynamically as students are recognized.';
+        }
+      } catch (e) {
+        reply = 'Unable to fetch CSE department count right now.';
+      }
+    } else if (lower.includes('how many se') || lower.includes('software engineering present')) {
+      try {
+        const sessionRes = await api.getActiveSession();
+        if (sessionRes.success && sessionRes.session?.department_stats) {
+          const seKey = Object.keys(sessionRes.session.department_stats).find(k => k.toLowerCase().includes('software') || k.toLowerCase().includes('se'));
+          if (seKey) {
+            const stat = sessionRes.session.department_stats[seKey];
+            reply = `In the active session, ${stat.present} out of ${stat.total} Software Engineering students are present (${stat.attendance_percentage} percent).`;
+          } else {
+            reply = 'No Software Engineering students in active session roster.';
+          }
+        } else {
+          reply = 'Active session department counts are updated dynamically.';
+        }
+      } catch (e) {
+        reply = 'Unable to fetch SE department count right now.';
+      }
+    } else if (lower.includes('how many eee') || lower.includes('electrical students present')) {
+      try {
+        const sessionRes = await api.getActiveSession();
+        if (sessionRes.success && sessionRes.session?.department_stats) {
+          const eeeKey = Object.keys(sessionRes.session.department_stats).find(k => k.toLowerCase().includes('electrical') || k.toLowerCase().includes('eee'));
+          if (eeeKey) {
+            const stat = sessionRes.session.department_stats[eeeKey];
+            reply = `In the active session, ${stat.present} out of ${stat.total} Electrical & Electronics students are present (${stat.attendance_percentage} percent).`;
+          } else {
+            reply = 'No Electrical Engineering students in active session roster.';
+          }
+        } else {
+          reply = 'Active session department counts are updated dynamically.';
+        }
+      } catch (e) {
+        reply = 'Unable to fetch EEE department count right now.';
+      }
+    } else if (lower.includes('how many are absent') || lower.includes('absent count') || lower.includes('absent students') || lower.includes('show absent students')) {
       try {
         const cmdData = await api.getCommandCenterData();
         if (cmdData.success && cmdData.data) {
-          reply = `Currently, ${cmdData.data.students_absent.count} students are absent today (${cmdData.data.students_absent.percentage} percent).`;
+          reply = `Currently, ${cmdData.data.students_absent.count} students are absent today (${cmdData.data.students_absent.percentage} percent turnout shortfall).`;
         } else {
           reply = 'Active absent count is calculated against the synchronized institutional roster.';
         }
@@ -172,6 +223,20 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     } else if (lower.includes('export attendance') || lower.includes('download report') || lower.includes('download attendance')) {
       onNavigateTab?.('attendance');
       reply = 'Navigating to Attendance Table. Click Export to download official institutional CSV.';
+    } else if (lower.includes('show iot') || lower.includes('show sensors') || lower.includes('campus devices') || lower.includes('smart classroom') || lower.includes('bluetooth devices') || lower.includes('device manager')) {
+      onNavigateTab?.('devices');
+      reply = 'Navigating to Campus IoT and Sensor Intelligence Hub.';
+    } else if (lower.includes('device count') || lower.includes('how many devices') || lower.includes('sensor status')) {
+      try {
+        const statsRes = await api.getDeviceStats();
+        if (statsRes.success) {
+          reply = `Campus Device Hub has ${statsRes.stats.total} registered nodes, with ${statsRes.stats.online} devices currently online.`;
+        } else {
+          reply = 'Device hub is online. Please review the Campus IoT tab.';
+        }
+      } catch (e) {
+        reply = 'Unable to fetch device stats right now.';
+      }
     } else if (lower.includes('system health') || lower.includes('diagnostics') || lower.includes('settings')) {
       onNavigateTab?.('system');
       reply = 'Opening System Hardening and Hardware Diagnostics panel.';

@@ -10,6 +10,7 @@ import {
   Layers,
   Sparkles,
   Award,
+  Radio,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -28,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const adminTabs = [
     { id: 'overview', label: 'Dashboard', icon: Activity },
     { id: 'live-camera', label: 'Live Camera', icon: Camera, highlight: true },
+    { id: 'devices', label: 'Campus IoT & Sensors', icon: Radio },
     { id: 'intelligence', label: 'AI Intelligence & Risk', icon: Sparkles },
     { id: 'students', label: 'Students', icon: UserCheck },
     { id: 'attendance', label: 'Attendance', icon: ShieldCheck },
@@ -40,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const hodTabs = [
     { id: 'overview', label: 'Overview', icon: Activity },
     { id: 'live-camera', label: 'Live Attendance Camera', icon: Camera, highlight: true },
+    { id: 'devices', label: 'Classroom IoT & Sensors', icon: Radio },
     { id: 'intelligence', label: 'Dept AI Insights', icon: Sparkles },
     { id: 'students', label: 'Dept Students', icon: UserCheck },
     { id: 'attendance', label: 'Attendance Records', icon: ShieldCheck },

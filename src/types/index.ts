@@ -203,6 +203,145 @@ export interface RegisteredCamera {
   created_at: string;
 }
 
+export type DeviceCategory =
+  | 'CAMERA'
+  | 'BLE_SENSOR'
+  | 'ESP32_GATEWAY'
+  | 'ENVIRONMENTAL_SENSOR'
+  | 'OCCUPANCY_SENSOR'
+  | 'DOOR_BEACON'
+  | 'REMOTE_SENSING';
+
+export type DeviceProtocol = 'HTTPS_REST' | 'WEBSOCKET' | 'MQTT' | 'BLE_GATT' | 'RTSP' | 'WEBRTC' | 'OPEN_METEO_API';
+
+export type DeviceStatus = 'ONLINE' | 'CONNECTING' | 'OFFLINE' | 'DEGRADED' | 'ERROR';
+
+export interface DeviceTelemetry {
+  temperature_c?: number;
+  humidity_pct?: number;
+  co2_ppm?: number;
+  pm25?: number;
+  pm10?: number;
+  voc_ppb?: number;
+  noise_db?: number;
+  occupancy_count?: number;
+  battery_pct?: number;
+  rssi_dbm?: number;
+  raw_payload?: Record<string, any>;
+  received_at: string;
+}
+
+export interface CampusDevice {
+  id: string;
+  name: string;
+  category: DeviceCategory;
+  device_type: string;
+  classroom: string;
+  building: string;
+  department: string;
+  protocol: DeviceProtocol;
+  ip_or_hostname?: string;
+  mac_or_uuid?: string;
+  device_token?: string;
+  status: DeviceStatus;
+  capabilities: string[];
+  telemetry?: DeviceTelemetry;
+  last_heartbeat?: string;
+  last_error?: string;
+  created_at: string;
+  registered_by: string;
+}
+
+export interface SmartClassroomCorrelation {
+  classroom: string;
+  session_id?: string;
+  subject?: string;
+  department?: string;
+  attendance_face_count: number;
+  physical_occupancy_count?: number;
+  occupancy_source?: string;
+  discrepancy: number;
+  discrepancy_alert?: string;
+  environmental?: {
+    temperature_c?: number;
+    humidity_pct?: number;
+    co2_ppm?: number;
+    air_quality_index?: number;
+    noise_db?: number;
+    telemetry_source?: string;
+    telemetry_time?: string;
+  };
+  last_updated: string;
+}
+
+export interface RemoteSensingData {
+  success: boolean;
+  provider: string;
+  attribution: string;
+  institution_location: {
+    campus: string;
+    city: string;
+    latitude: number;
+    longitude: number;
+    elevation_m: number;
+  };
+  acquisition_time: string;
+  data_freshness: string;
+  spatial_resolution: string;
+  weather?: {
+    temperature_c: number;
+    apparent_temperature_c: number;
+    relative_humidity_pct: number;
+    surface_pressure_hpa: number;
+    cloud_cover_pct: number;
+    wind_speed_kmh: number;
+    wind_direction_deg: number;
+    solar_irradiance_wm2: number;
+    precipitation_mm: number;
+    weather_code: number;
+  };
+  air_quality?: {
+    us_aqi: number;
+    european_aqi: number;
+    pm2_5_ugm3: number;
+    pm10_ugm3: number;
+    carbon_monoxide_ugm3: number;
+    nitrogen_dioxide_ugm3: number;
+    ozone_ugm3: number;
+  };
+}
+
+export type BluetoothCapabilityState =
+  | 'AVAILABLE'
+  | 'BLOCKED_BY_BROWSER'
+  | 'BLOCKED_BY_PERMISSIONS_POLICY'
+  | 'UNSUPPORTED'
+  | 'HTTPS_REQUIRED'
+  | 'USER_PERMISSION_REQUIRED'
+  | 'BLUETOOTH_SUPPORTED'
+  | 'BLUETOOTH_UNSUPPORTED'
+  | 'PERMISSION_REQUIRED'
+  | 'PERMISSION_DENIED'
+  | 'PERMISSIONS_POLICY_BLOCKED'
+  | 'INSECURE_CONTEXT'
+  | 'SCANNING'
+  | 'DEVICE_FOUND'
+  | 'CONNECTED'
+  | 'DISCONNECTED'
+  | 'ERROR';
+
+export interface DeviceEventLog {
+  id: string;
+  type: 'DEVICE_CONNECTED' | 'DEVICE_DISCONNECTED' | 'TELEMETRY_RECEIVED' | 'SENSOR_WARNING' | 'HEARTBEAT' | 'CORRELATION_WARNING' | 'DEVICE_REGISTERED' | string;
+  device_id: string;
+  device_name: string;
+  classroom: string;
+  message: string;
+  severity: 'info' | 'warning' | 'error' | 'success';
+  timestamp: string;
+  data?: any;
+}
+
 export interface ReachabilityTestResult {
   success: boolean;
   url: string;

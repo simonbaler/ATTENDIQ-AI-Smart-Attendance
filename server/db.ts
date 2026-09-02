@@ -286,6 +286,77 @@ export interface RegisteredCamera {
   created_at: string;
 }
 
+export type DeviceCategory =
+  | 'CAMERA'
+  | 'BLE_SENSOR'
+  | 'ESP32_GATEWAY'
+  | 'ENVIRONMENTAL_SENSOR'
+  | 'OCCUPANCY_SENSOR'
+  | 'DOOR_BEACON'
+  | 'REMOTE_SENSING';
+
+export type DeviceProtocol = 'HTTPS_REST' | 'WEBSOCKET' | 'MQTT' | 'BLE_GATT' | 'RTSP' | 'WEBRTC' | 'OPEN_METEO_API';
+
+export type DeviceStatus = 'ONLINE' | 'CONNECTING' | 'OFFLINE' | 'DEGRADED' | 'ERROR';
+
+export interface DeviceTelemetry {
+  temperature_c?: number;
+  humidity_pct?: number;
+  co2_ppm?: number;
+  pm25?: number;
+  pm10?: number;
+  voc_ppb?: number;
+  noise_db?: number;
+  occupancy_count?: number;
+  battery_pct?: number;
+  rssi_dbm?: number;
+  raw_payload?: Record<string, any>;
+  received_at: string;
+}
+
+export interface CampusDevice {
+  id: string;
+  name: string;
+  category: DeviceCategory;
+  device_type: string;
+  classroom: string;
+  building: string;
+  department: string;
+  protocol: DeviceProtocol;
+  ip_or_hostname?: string;
+  mac_or_uuid?: string;
+  device_token?: string;
+  status: DeviceStatus;
+  capabilities: string[];
+  telemetry?: DeviceTelemetry;
+  last_heartbeat?: string;
+  last_error?: string;
+  created_at: string;
+  registered_by: string;
+}
+
+export interface SmartClassroomCorrelation {
+  classroom: string;
+  session_id?: string;
+  subject?: string;
+  department?: string;
+  attendance_face_count: number;
+  physical_occupancy_count?: number;
+  occupancy_source?: string;
+  discrepancy: number;
+  discrepancy_alert?: string;
+  environmental?: {
+    temperature_c?: number;
+    humidity_pct?: number;
+    co2_ppm?: number;
+    air_quality_index?: number;
+    noise_db?: number;
+    telemetry_source?: string;
+    telemetry_time?: string;
+  };
+  last_updated: string;
+}
+
 export type AnomalyType =
   | 'MASS_ABSENCE'
   | 'SUDDEN_DROP'
@@ -397,6 +468,7 @@ const ANOMALIES_FILE = path.join(DATA_DIR, 'anomalies.json');
 const SECURITY_EVENTS_FILE = path.join(LOGS_DIR, 'security_events.json');
 const RECOGNITION_EVENTS_FILE = path.join(LOGS_DIR, 'recognition_events.json');
 const AI_INSIGHTS_FILE = path.join(DATA_DIR, 'ai_insights.json');
+const CAMPUS_DEVICES_FILE = path.join(DATA_DIR, 'campus_devices.json');
 
 const serverStartTime = Date.now();
 
@@ -2232,6 +2304,180 @@ export const db = {
       return true;
     }
     return false;
+  },
+
+  // Campus IoT, BLE, ESP32 & Remote Sensing Devices
+  getCampusDevices: (filter?: {
+    category?: string;
+    classroom?: string;
+    status?: string;
+    department?: string;
+  }): CampusDevice[] => {
+    let devices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+    if (!filter) return devices;
+
+    if (filter.category && filter.category !== 'ALL') {
+      devices = devices.filter((d) => d.category === filter.category);
+    }
+    if (filter.classroom && filter.classroom !== 'ALL') {
+      devices = devices.filter((d) => d.classroom.toLowerCase() === filter.classroom!.toLowerCase());
+    }
+    if (filter.status && filter.status !== 'ALL') {
+      devices = devices.filter((d) => d.status === filter.status);
+    }
+    if (filter.department && filter.department !== 'ALL') {
+      devices = devices.filter((d) => d.department.toLowerCase() === filter.department!.toLowerCase());
+    }
+    return devices;
+  },
+
+  getCampusDeviceById: (id: string): CampusDevice | undefined => {
+    const devices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+    return devices.find((d) => d.id === id);
+  },
+
+  getCampusDeviceByToken: (token: string): CampusDevice | undefined => {
+    const devices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+    return devices.find((d) => d.device_token === token);
+  },
+
+  saveCampusDevice: (device: CampusDevice): CampusDevice => {
+    const devices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+    const idx = devices.findIndex((d) => d.id === device.id);
+    if (idx >= 0) {
+      devices[idx] = device;
+    } else {
+      devices.push(device);
+    }
+    writeJsonFile(CAMPUS_DEVICES_FILE, devices);
+    return device;
+  },
+
+  deleteCampusDevice: (id: string): boolean => {
+    const devices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+    const filtered = devices.filter((d) => d.id !== id);
+    if (filtered.length !== devices.length) {
+      writeJsonFile(CAMPUS_DEVICES_FILE, filtered);
+      return true;
+    }
+    return false;
+  },
+
+  recordDeviceTelemetry: (
+    idOrToken: string,
+    telemetryData: Partial<DeviceTelemetry>
+  ): { success: boolean; device?: CampusDevice; error?: string } => {
+    const devices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+    const idx = devices.findIndex((d) => d.id === idOrToken || d.device_token === idOrToken);
+
+    if (idx < 0) {
+      return { success: false, error: 'Device not found or invalid authentication token.' };
+    }
+
+    const device = devices[idx];
+    const now = new Date().toISOString();
+
+    const telemetry: DeviceTelemetry = {
+      ...device.telemetry,
+      ...telemetryData,
+      received_at: now,
+    };
+
+    device.telemetry = telemetry;
+    device.status = 'ONLINE';
+    device.last_heartbeat = now;
+    devices[idx] = device;
+
+    writeJsonFile(CAMPUS_DEVICES_FILE, devices);
+    return { success: true, device };
+  },
+
+  updateDeviceHeartbeat: (idOrToken: string, status: DeviceStatus = 'ONLINE'): boolean => {
+    const devices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+    const idx = devices.findIndex((d) => d.id === idOrToken || d.device_token === idOrToken);
+    if (idx >= 0) {
+      devices[idx].status = status;
+      devices[idx].last_heartbeat = new Date().toISOString();
+      writeJsonFile(CAMPUS_DEVICES_FILE, devices);
+      return true;
+    }
+    return false;
+  },
+
+  getSmartClassroomCorrelations: (): SmartClassroomCorrelation[] => {
+    const activeSession = db.getActiveSession();
+    const devices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+    const correlations: SmartClassroomCorrelation[] = [];
+
+    // Group classrooms
+    const classrooms = ['LH-101', 'LH-102', 'LH-103', 'LH-104', 'LH-105', 'LH-201', 'LH-202', 'LH-301', 'IoT-Lab-1', 'AI-Lab-1'];
+
+    classrooms.forEach((classroom) => {
+      const isCurrentActive = activeSession && activeSession.classroom.toLowerCase() === classroom.toLowerCase();
+      let attendanceFaceCount = 0;
+      let subject = isCurrentActive ? activeSession.subject : undefined;
+      let department = isCurrentActive ? activeSession.department : undefined;
+      let sessionId = isCurrentActive ? activeSession.id : undefined;
+
+      if (isCurrentActive) {
+        const records = db.getAttendance({ session_id: activeSession.id, status: 'PRESENT' });
+        attendanceFaceCount = records.length;
+      }
+
+      // Find occupancy devices registered for this classroom
+      const classroomDevices = devices.filter((d) => d.classroom.toLowerCase() === classroom.toLowerCase());
+      const occupancyDevice = classroomDevices.find(
+        (d) =>
+          d.status === 'ONLINE' &&
+          d.telemetry &&
+          d.telemetry.occupancy_count !== undefined &&
+          (d.category === 'OCCUPANCY_SENSOR' || d.category === 'ESP32_GATEWAY' || d.category === 'BLE_SENSOR')
+      );
+
+      const envDevice = classroomDevices.find(
+        (d) =>
+          d.status === 'ONLINE' &&
+          d.telemetry &&
+          (d.telemetry.temperature_c !== undefined || d.telemetry.co2_ppm !== undefined)
+      );
+
+      const physicalOccupancy = occupancyDevice?.telemetry?.occupancy_count;
+      const discrepancy = physicalOccupancy !== undefined ? physicalOccupancy - attendanceFaceCount : 0;
+
+      let discrepancyAlert: string | undefined = undefined;
+      if (isCurrentActive && physicalOccupancy !== undefined) {
+        if (discrepancy > 2) {
+          discrepancyAlert = `${discrepancy} unverified persons detected in classroom by physical occupancy sensor.`;
+        } else if (discrepancy < -2) {
+          discrepancyAlert = `Physical occupancy reading (${physicalOccupancy}) is lower than verified face attendance count (${attendanceFaceCount}). Sensor obstruction possible.`;
+        }
+      }
+
+      correlations.push({
+        classroom,
+        session_id: sessionId,
+        subject,
+        department,
+        attendance_face_count: attendanceFaceCount,
+        physical_occupancy_count: physicalOccupancy,
+        occupancy_source: occupancyDevice ? `${occupancyDevice.name} (${occupancyDevice.device_type})` : undefined,
+        discrepancy,
+        discrepancy_alert: discrepancyAlert,
+        environmental: envDevice?.telemetry
+          ? {
+              temperature_c: envDevice.telemetry.temperature_c,
+              humidity_pct: envDevice.telemetry.humidity_pct,
+              co2_ppm: envDevice.telemetry.co2_ppm,
+              noise_db: envDevice.telemetry.noise_db,
+              telemetry_source: envDevice.name,
+              telemetry_time: envDevice.telemetry.received_at,
+            }
+          : undefined,
+        last_updated: new Date().toISOString(),
+      });
+    });
+
+    return correlations;
   },
 };
 

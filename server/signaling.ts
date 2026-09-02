@@ -12,13 +12,10 @@ interface SignalingClient {
 // In-memory registry of active signaling peers
 const peers: Map<WebSocket, SignalingClient> = new Map();
 
-export function setupSignalingServer(httpServer: HttpServer) {
-  const wss = new WebSocketServer({
-    server: httpServer,
-    path: '/api/mobile/signaling',
-  });
+export function createSignalingServer(): WebSocketServer {
+  const wss = new WebSocketServer({ noServer: true });
 
-  console.log('[SITS AI] WebRTC WebSocket Signaling Server mounted at /api/mobile/signaling');
+  console.log('[SITS AI] WebRTC WebSocket Signaling Server initialized');
 
   wss.on('connection', (ws: WebSocket, req) => {
     // Determine client connection URL
@@ -237,4 +234,10 @@ export function setupSignalingServer(httpServer: HttpServer) {
       db.disconnectMobileCamera(client.sessionId, 'MOBILE_CLIENT_DISCONNECTED');
     }
   }
+
+  return wss;
+}
+
+export function setupSignalingServer(httpServer: HttpServer) {
+  return createSignalingServer();
 }

@@ -7,6 +7,10 @@ import {
   SystemSettings,
   DashboardSummary,
   DepartmentInfo,
+  CampusDevice,
+  SmartClassroomCorrelation,
+  RemoteSensingData,
+  DeviceTelemetry,
 } from '../types';
 
 const API_BASE = '/api';
@@ -967,6 +971,156 @@ export const api = {
     const res = await fetch(`${API_BASE}/cameras/${id}/test`, {
       method: 'POST',
       headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  // Campus Devices & IoT Ecosystem
+  async getCampusDevices(params?: {
+    category?: string;
+    classroom?: string;
+    status?: string;
+    department?: string;
+  }): Promise<{ success: boolean; count: number; devices: CampusDevice[] }> {
+    const query = new URLSearchParams();
+    if (params?.category) query.append('category', params.category);
+    if (params?.classroom) query.append('classroom', params.classroom);
+    if (params?.status) query.append('status', params.status);
+    if (params?.department) query.append('department', params.department);
+
+    const res = await fetch(`${API_BASE}/devices?${query.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getDeviceStats(): Promise<{
+    success: boolean;
+    stats: {
+      total: number;
+      online: number;
+      offline: number;
+      connecting: number;
+      errors: number;
+      categories: Record<string, number>;
+    };
+  }> {
+    const res = await fetch(`${API_BASE}/devices/stats`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getCampusDevice(id: string): Promise<{ success: boolean; device: CampusDevice }> {
+    const res = await fetch(`${API_BASE}/devices/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async registerCampusDevice(data: Partial<CampusDevice>): Promise<{
+    success: boolean;
+    message: string;
+    device: CampusDevice;
+    credentials?: {
+      device_id: string;
+      device_token: string;
+      ingestion_url: string;
+      header_auth: string;
+    };
+  }> {
+    const res = await fetch(`${API_BASE}/devices/register`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async updateCampusDevice(id: string, data: Partial<CampusDevice>): Promise<{
+    success: boolean;
+    message: string;
+    device: CampusDevice;
+  }> {
+    const res = await fetch(`${API_BASE}/devices/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async deleteCampusDevice(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/devices/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async submitDeviceTelemetry(
+    id: string,
+    telemetry: Partial<DeviceTelemetry>,
+    deviceToken?: string
+  ): Promise<{ success: boolean; message: string; timestamp: string }> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...((getAuthHeaders() as any) || {}),
+    };
+    if (deviceToken) {
+      headers['X-Device-Token'] = deviceToken;
+    }
+
+    const res = await fetch(`${API_BASE}/devices/${id}/telemetry`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(telemetry),
+    });
+    return res.json();
+  },
+
+  async getSmartClassroomCorrelations(): Promise<{
+    success: boolean;
+    count: number;
+    correlations: SmartClassroomCorrelation[];
+  }> {
+    const res = await fetch(`${API_BASE}/devices/smart-classroom/correlations`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getRemoteSensingWeather(lat = 17.4399, lon = 78.6811): Promise<RemoteSensingData> {
+    const res = await fetch(`${API_BASE}/devices/remote-sensing/weather?lat=${lat}&lon=${lon}`);
+    return res.json();
+  },
+
+  async getDeviceEvents(): Promise<{ success: boolean; count: number; events: import('../types').DeviceEventLog[] }> {
+    const res = await fetch(`${API_BASE}/devices/events`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async submitEsp32Telemetry(payload: {
+    deviceId: string;
+    token?: string;
+    classroom?: string;
+    timestamp?: string;
+    sensors: Record<string, any>;
+  }): Promise<{ success: boolean; message: string; deviceId?: string; classroom?: string; timestamp?: string }> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...((getAuthHeaders() as any) || {}),
+    };
+    if (payload.token) {
+      headers['X-Device-Token'] = payload.token;
+    }
+
+    const res = await fetch(`${API_BASE}/devices/telemetry`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
     });
     return res.json();
   },

@@ -9,6 +9,7 @@ import { UserManagement } from '../components/UserManagement';
 import { SystemSettingsView } from '../components/SystemSettingsView';
 import { IntelligenceView } from '../components/IntelligenceView';
 import { ValidationHardeningView } from '../components/ValidationHardeningView';
+import { CampusDeviceManager } from '../components/CampusDeviceManager';
 import { SessionModal } from '../components/SessionModal';
 import { StudentFormModal } from '../components/StudentFormModal';
 import { VoiceAssistant } from '../components/VoiceAssistant';
@@ -79,6 +80,8 @@ export const AdminDashboard: React.FC = () => {
           />
         )}
 
+        {activeTab === 'devices' && <CampusDeviceManager userRole="ADMIN" />}
+
         {activeTab === 'intelligence' && <IntelligenceView departments={departments} />}
 
         {activeTab === 'students' && <StudentDirectory departments={departments} />}
@@ -126,6 +129,7 @@ export const AdminDashboard: React.FC = () => {
           if (tab === 'camera') setActiveTab('live-camera');
           else if (tab === 'attendance') setActiveTab('attendance');
           else if (tab === 'students') setActiveTab('students');
+          else if (tab === 'devices') setActiveTab('devices');
           else if (tab === 'intelligence') setActiveTab('intelligence');
           else if (tab === 'system') setActiveTab('settings');
         }}

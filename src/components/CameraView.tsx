@@ -32,6 +32,7 @@ import { AttendanceSession, RecognitionBox, Student, User, MobileCameraSession }
 import { DesktopWebRTCReceiver, WebRTCConnectionState } from '../services/webrtc';
 import { SensorIntelligenceModal } from './SensorIntelligenceModal';
 import { ObservabilityDiagnosticsModal } from './ObservabilityDiagnosticsModal';
+import { LiveFaceGrid } from './LiveFaceGrid';
 
 interface CameraViewProps {
   user?: User | null;
@@ -1279,6 +1280,9 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
           </div>
         </div>
       </div>
+
+      {/* Live Classroom Attendance Wall (Phase 8 Requirement) */}
+      <LiveFaceGrid detectedFaces={detectedFaces} />
 
       {/* Mobile Camera Pairing Modal */}
       {showPairModal && (

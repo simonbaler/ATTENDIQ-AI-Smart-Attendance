@@ -693,6 +693,17 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
               </button>
 
               <button
+                onClick={() => onNavigate('devices')}
+                className="w-full p-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left flex items-center justify-between text-xs transition"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <Radio className="w-4 h-4 text-cyan-400" />
+                  <span className="font-semibold text-white">Campus IoT & Sensor Hub</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
                 onClick={() => onNavigate('students')}
                 className="w-full p-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left flex items-center justify-between text-xs transition"
               >

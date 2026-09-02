@@ -5,6 +5,7 @@ import { CameraView } from '../components/CameraView';
 import { StudentDirectory } from '../components/StudentDirectory';
 import { AttendanceTable } from '../components/AttendanceTable';
 import { IntelligenceView } from '../components/IntelligenceView';
+import { CampusDeviceManager } from '../components/CampusDeviceManager';
 import { SessionModal } from '../components/SessionModal';
 import { StudentFormModal } from '../components/StudentFormModal';
 import { VoiceAssistant } from '../components/VoiceAssistant';
@@ -81,6 +82,8 @@ export const HodDashboard: React.FC = () => {
             onRequestNewSession={() => setShowSessionModal(true)}
           />
         )}
+
+        {activeTab === 'devices' && <CampusDeviceManager userRole="HOD" userDepartment={user?.department} />}
 
         {activeTab === 'intelligence' && <IntelligenceView departments={departments} />}
 
