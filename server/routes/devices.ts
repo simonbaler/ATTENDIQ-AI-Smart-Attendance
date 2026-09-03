@@ -173,6 +173,32 @@ router.get('/remote-sensing/weather', async (req, res) => {
   }
 });
 
+// GET /api/devices/:id/status - Real device status and last-seen tracking
+router.get('/:id/status', (req, res) => {
+  try {
+    const device = db.getCampusDeviceById(req.params.id);
+    if (!device) {
+      return res.status(404).json({ success: false, message: 'Device not found.' });
+    }
+    const isOnline = device.status === 'ONLINE';
+    res.json({
+      success: true,
+      deviceId: device.id,
+      name: device.name,
+      status: device.status,
+      is_online: isOnline,
+      classroom: device.classroom,
+      department: device.department,
+      last_seen: device.last_seen || device.last_heartbeat || null,
+      last_heartbeat: device.last_heartbeat || null,
+      server_timestamp: new Date().toISOString(),
+      telemetry: device.telemetry || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/devices/:id - Get specific device
 router.get('/:id', authenticateToken, (req, res) => {
   try {
@@ -330,20 +356,92 @@ router.delete('/:id', authenticateToken, (req, res) => {
   }
 });
 
+// Helper function to extract and normalize sensor values without replacing null with 0
+function parseSensorValue(val: any): number | null | undefined {
+  if (val === null) return null;
+  if (val === undefined) return undefined;
+  const num = Number(val);
+  return isNaN(num) ? null : num;
+}
+
+// POST /api/devices/heartbeat - Generic heartbeat endpoint for ESP32 & physical gateways
+router.post('/heartbeat', (req, res) => {
+  try {
+    const { deviceId, device_id, token } = req.body;
+    const targetId = deviceId || device_id || req.query.deviceId || req.query.device_id;
+    const headerToken =
+      req.headers['x-device-token'] ||
+      (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+    const targetToken = token || headerToken || req.query.token;
+
+    if (!targetId) {
+      return res.status(400).json({ success: false, message: 'Missing deviceId in request.' });
+    }
+
+    const device =
+      db.getCampusDeviceById(targetId) ||
+      db.getCampusDevices().find((d) => d.name === targetId || d.mac_or_uuid === targetId);
+    if (!device) {
+      return res.status(404).json({ success: false, message: `Device '${targetId}' not found.` });
+    }
+
+    if (device.device_token && device.device_token !== targetToken) {
+      return res.status(401).json({ success: false, message: 'Unauthorized: Invalid device token.' });
+    }
+
+    const wasOffline = device.status !== 'ONLINE';
+    db.updateDeviceHeartbeat(device.id, 'ONLINE');
+    notifyDeviceStatus(device.id, 'ONLINE', device.classroom, device.department);
+
+    if (wasOffline) {
+      recordDeviceEvent({
+        type: 'DEVICE_ONLINE',
+        device_id: device.id,
+        device_name: device.name,
+        classroom: device.classroom,
+        message: `Hardware node ${device.name} in ${device.classroom} is now ONLINE.`,
+        severity: 'success',
+      });
+    }
+
+    recordDeviceEvent({
+      type: 'DEVICE_HEARTBEAT',
+      device_id: device.id,
+      device_name: device.name,
+      classroom: device.classroom,
+      message: `Heartbeat acknowledged from physical node ${device.name}.`,
+      severity: 'info',
+    });
+
+    res.json({
+      success: true,
+      deviceId: device.id,
+      status: 'ONLINE',
+      server_timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/devices/telemetry - Generic ESP32 / Gateway Ingestion Endpoint
 // Supports { deviceId, token, classroom, timestamp, sensors: { temperature_c, humidity_percent, occupancy, air_quality, ... } }
 router.post('/telemetry', (req, res) => {
   try {
-    const { deviceId, device_id, token, classroom, sensors } = req.body;
+    const { deviceId, device_id, token, classroom, sensors, timestamp, device_timestamp } = req.body;
     const targetId = deviceId || device_id;
-    const authHeader = req.headers['x-device-token'] || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+    const authHeader =
+      req.headers['x-device-token'] ||
+      (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
     const targetToken = token || authHeader || req.query.token;
 
     if (!targetId) {
       return res.status(400).json({ success: false, message: 'Missing deviceId in payload.' });
     }
 
-    const device = db.getCampusDeviceById(targetId) || db.getCampusDevices().find(d => d.name === targetId || d.mac_or_uuid === targetId);
+    const device =
+      db.getCampusDeviceById(targetId) ||
+      db.getCampusDevices().find((d) => d.name === targetId || d.mac_or_uuid === targetId);
     if (!device) {
       return res.status(404).json({ success: false, message: `Device '${targetId}' not registered.` });
     }
@@ -353,27 +451,46 @@ router.post('/telemetry', (req, res) => {
     }
 
     const s = sensors || req.body;
-    const temperature_c = typeof s.temperature_c === 'number' ? s.temperature_c : typeof s.temp === 'number' ? s.temp : undefined;
-    const humidity_pct = typeof s.humidity_pct === 'number' ? s.humidity_pct : typeof s.humidity_percent === 'number' ? s.humidity_percent : typeof s.humidity === 'number' ? s.humidity : undefined;
-    const occupancy_count = typeof s.occupancy_count === 'number' ? s.occupancy_count : typeof s.occupancy === 'number' ? s.occupancy : undefined;
-    const co2_ppm = typeof s.co2_ppm === 'number' ? s.co2_ppm : typeof s.co2 === 'number' ? s.co2 : typeof s.air_quality === 'number' ? s.air_quality : undefined;
-    const noise_db = typeof s.noise_db === 'number' ? s.noise_db : typeof s.noise === 'number' ? s.noise : undefined;
-    const battery_pct = typeof s.battery_pct === 'number' ? s.battery_pct : typeof s.battery === 'number' ? s.battery : undefined;
-    const rssi_dbm = typeof s.rssi_dbm === 'number' ? s.rssi_dbm : typeof s.rssi === 'number' ? s.rssi : undefined;
+    const deviceTime = timestamp || device_timestamp || s.timestamp || null;
+    const serverTime = new Date().toISOString();
+
+    // Respect null explicitly - null means physical device does not provide that sensor
+    const tempC = parseSensorValue(s.temperature_c ?? s.temp);
+    const humPct = parseSensorValue(s.humidity_percent ?? s.humidity_pct ?? s.humidity);
+    const co2Ppm = parseSensorValue(s.air_quality ?? s.co2_ppm ?? s.co2);
+    const occCount = parseSensorValue(s.occupancy ?? s.occupancy_count);
+    const noiseDb = parseSensorValue(s.noise_db ?? s.noise);
+    const batPct = parseSensorValue(s.battery_percent ?? s.battery_pct ?? s.battery);
+    const rssiDbm = parseSensorValue(s.rssi_dbm ?? s.rssi);
+
+    const wasOffline = device.status !== 'ONLINE';
 
     const result = db.recordDeviceTelemetry(device.id, {
-      temperature_c,
-      humidity_pct,
-      co2_ppm,
-      occupancy_count,
-      noise_db,
-      battery_pct,
-      rssi_dbm,
+      temperature_c: tempC !== undefined ? tempC : undefined,
+      humidity_pct: humPct !== undefined ? humPct : undefined,
+      co2_ppm: co2Ppm !== undefined ? co2Ppm : undefined,
+      occupancy_count: occCount !== undefined ? occCount : undefined,
+      noise_db: noiseDb !== undefined ? noiseDb : undefined,
+      battery_pct: batPct !== undefined ? batPct : undefined,
+      rssi_dbm: rssiDbm !== undefined ? rssiDbm : undefined,
+      device_timestamp: deviceTime,
+      server_timestamp: serverTime,
       raw_payload: req.body,
     });
 
     if (!result.success || !result.device) {
       return res.status(400).json({ success: false, message: result.error });
+    }
+
+    if (wasOffline) {
+      recordDeviceEvent({
+        type: 'DEVICE_ONLINE',
+        device_id: device.id,
+        device_name: device.name,
+        classroom: device.classroom,
+        message: `Hardware node ${device.name} transitioned to ONLINE upon receiving real telemetry.`,
+        severity: 'success',
+      });
     }
 
     // Broadcast in real-time to dashboard WebSocket clients
@@ -384,13 +501,17 @@ router.post('/telemetry', (req, res) => {
       device_id: result.device.id,
       device_name: result.device.name,
       classroom: result.device.classroom,
-      message: `ESP32 Wi-Fi telemetry ingested for ${result.device.classroom}: ${
-        temperature_c !== undefined ? `${temperature_c.toFixed(1)}°C, ` : ''
-      }${humidity_pct !== undefined ? `${humidity_pct}% RH, ` : ''}${
-        occupancy_count !== undefined ? `${occupancy_count} occupants, ` : ''
-      }${co2_ppm !== undefined ? `${co2_ppm} ppm CO₂` : ''}`,
+      message: `Physical ESP32 telemetry ingested for ${result.device.classroom}: ${
+        tempC !== null && tempC !== undefined ? `${tempC.toFixed(1)}°C, ` : ''
+      }${humPct !== null && humPct !== undefined ? `${humPct}% RH, ` : ''}${
+        occCount !== null && occCount !== undefined ? `${occCount} occupants, ` : ''
+      }${co2Ppm !== null && co2Ppm !== undefined ? `${co2Ppm} ppm CO₂` : ''}`,
       severity: 'info',
-      data: result.device.telemetry,
+      data: {
+        ...result.device.telemetry,
+        device_timestamp: deviceTime,
+        server_timestamp: serverTime,
+      },
     });
 
     res.json({
@@ -398,7 +519,8 @@ router.post('/telemetry', (req, res) => {
       message: 'Telemetry received and broadcasted.',
       deviceId: result.device.id,
       classroom: result.device.classroom,
-      timestamp: new Date().toISOString(),
+      device_timestamp: deviceTime,
+      server_timestamp: serverTime,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
@@ -429,6 +551,7 @@ router.post('/:id/telemetry', (req, res) => {
       humidity_pct,
       humidity_percent,
       co2_ppm,
+      air_quality,
       pm25,
       pm10,
       voc_ppb,
@@ -436,33 +559,57 @@ router.post('/:id/telemetry', (req, res) => {
       occupancy_count,
       occupancy,
       battery_pct,
+      battery_percent,
       rssi_dbm,
       raw_payload,
       sensors,
+      timestamp,
+      device_timestamp,
     } = req.body;
 
     const s = sensors || {};
-    const finalTemp = typeof temperature_c === 'number' ? temperature_c : typeof s.temperature_c === 'number' ? s.temperature_c : undefined;
-    const finalHum = typeof humidity_pct === 'number' ? humidity_pct : typeof humidity_percent === 'number' ? humidity_percent : typeof s.humidity_percent === 'number' ? s.humidity_percent : undefined;
-    const finalOcc = typeof occupancy_count === 'number' ? occupancy_count : typeof occupancy === 'number' ? occupancy : typeof s.occupancy === 'number' ? s.occupancy : undefined;
-    const finalCo2 = typeof co2_ppm === 'number' ? co2_ppm : typeof s.co2_ppm === 'number' ? s.co2_ppm : typeof s.air_quality === 'number' ? s.air_quality : undefined;
+    const deviceTime = timestamp || device_timestamp || s.timestamp || null;
+    const serverTime = new Date().toISOString();
+
+    const finalTemp = parseSensorValue(temperature_c ?? s.temperature_c ?? s.temp);
+    const finalHum = parseSensorValue(humidity_percent ?? humidity_pct ?? s.humidity_percent ?? s.humidity_pct ?? s.humidity);
+    const finalOcc = parseSensorValue(occupancy ?? occupancy_count ?? s.occupancy ?? s.occupancy_count);
+    const finalCo2 = parseSensorValue(air_quality ?? co2_ppm ?? s.air_quality ?? s.co2_ppm ?? s.co2);
+    const finalNoise = parseSensorValue(noise_db ?? s.noise_db ?? s.noise);
+    const finalBat = parseSensorValue(battery_percent ?? battery_pct ?? s.battery_percent ?? s.battery_pct ?? s.battery);
+    const finalRssi = parseSensorValue(rssi_dbm ?? s.rssi_dbm ?? s.rssi);
+
+    const wasOffline = device.status !== 'ONLINE';
 
     const result = db.recordDeviceTelemetry(id, {
-      temperature_c: finalTemp,
-      humidity_pct: finalHum,
-      co2_ppm: finalCo2,
-      pm25: typeof pm25 === 'number' ? pm25 : s.pm25,
-      pm10: typeof pm10 === 'number' ? pm10 : s.pm10,
-      voc_ppb: typeof voc_ppb === 'number' ? voc_ppb : s.voc_ppb,
-      noise_db: typeof noise_db === 'number' ? noise_db : s.noise_db,
-      occupancy_count: finalOcc,
-      battery_pct: typeof battery_pct === 'number' ? battery_pct : s.battery_pct,
-      rssi_dbm: typeof rssi_dbm === 'number' ? rssi_dbm : s.rssi_dbm,
+      temperature_c: finalTemp !== undefined ? finalTemp : undefined,
+      humidity_pct: finalHum !== undefined ? finalHum : undefined,
+      co2_ppm: finalCo2 !== undefined ? finalCo2 : undefined,
+      pm25: parseSensorValue(pm25 ?? s.pm25) ?? undefined,
+      pm10: parseSensorValue(pm10 ?? s.pm10) ?? undefined,
+      voc_ppb: parseSensorValue(voc_ppb ?? s.voc_ppb) ?? undefined,
+      noise_db: finalNoise !== undefined ? finalNoise : undefined,
+      occupancy_count: finalOcc !== undefined ? finalOcc : undefined,
+      battery_pct: finalBat !== undefined ? finalBat : undefined,
+      rssi_dbm: finalRssi !== undefined ? finalRssi : undefined,
+      device_timestamp: deviceTime,
+      server_timestamp: serverTime,
       raw_payload,
     });
 
     if (!result.success || !result.device) {
       return res.status(400).json({ success: false, message: result.error });
+    }
+
+    if (wasOffline) {
+      recordDeviceEvent({
+        type: 'DEVICE_ONLINE',
+        device_id: device.id,
+        device_name: device.name,
+        classroom: device.classroom,
+        message: `Physical device ${device.name} is now ONLINE.`,
+        severity: 'success',
+      });
     }
 
     // Broadcast in real time
@@ -475,13 +622,20 @@ router.post('/:id/telemetry', (req, res) => {
       classroom: result.device.classroom,
       message: `Telemetry recorded for ${result.device.name} in ${result.device.classroom}.`,
       severity: 'info',
-      data: result.device.telemetry,
+      data: {
+        ...result.device.telemetry,
+        device_timestamp: deviceTime,
+        server_timestamp: serverTime,
+      },
     });
 
     res.json({
       success: true,
       message: 'Telemetry recorded successfully.',
-      timestamp: new Date().toISOString(),
+      deviceId: result.device.id,
+      classroom: result.device.classroom,
+      device_timestamp: deviceTime,
+      server_timestamp: serverTime,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
@@ -492,7 +646,10 @@ router.post('/:id/telemetry', (req, res) => {
 router.post('/:id/heartbeat', (req, res) => {
   try {
     const { id } = req.params;
-    const token = req.headers['x-device-token'] || req.query.token;
+    const token =
+      req.headers['x-device-token'] ||
+      (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null) ||
+      req.query.token;
 
     const device = db.getCampusDeviceById(id);
     if (!device) {
@@ -500,25 +657,38 @@ router.post('/:id/heartbeat', (req, res) => {
     }
 
     if (device.device_token && device.device_token !== token) {
-      return res.status(401).json({ success: false, message: 'Unauthorized device token.' });
+      return res.status(401).json({ success: false, message: 'Unauthorized: Invalid device token.' });
     }
 
+    const wasOffline = device.status !== 'ONLINE';
     db.updateDeviceHeartbeat(id, 'ONLINE');
     notifyDeviceStatus(id, 'ONLINE', device.classroom, device.department);
 
+    if (wasOffline) {
+      recordDeviceEvent({
+        type: 'DEVICE_ONLINE',
+        device_id: device.id,
+        device_name: device.name,
+        classroom: device.classroom,
+        message: `Hardware node ${device.name} transitioned to ONLINE via heartbeat.`,
+        severity: 'success',
+      });
+    }
+
     recordDeviceEvent({
-      type: 'HEARTBEAT',
+      type: 'DEVICE_HEARTBEAT',
       device_id: device.id,
       device_name: device.name,
       classroom: device.classroom,
-      message: `Ping / Heartbeat acknowledged from ${device.name}.`,
+      message: `Heartbeat acknowledged from ${device.name}.`,
       severity: 'info',
     });
 
     res.json({
       success: true,
+      deviceId: device.id,
       status: 'ONLINE',
-      server_time: new Date().toISOString(),
+      server_timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

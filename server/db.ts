@@ -311,6 +311,8 @@ export interface DeviceTelemetry {
   battery_pct?: number;
   rssi_dbm?: number;
   raw_payload?: Record<string, any>;
+  device_timestamp?: string;
+  server_timestamp?: string;
   received_at: string;
 }
 
@@ -330,6 +332,7 @@ export interface CampusDevice {
   capabilities: string[];
   telemetry?: DeviceTelemetry;
   last_heartbeat?: string;
+  last_seen?: string;
   last_error?: string;
   created_at: string;
   registered_by: string;
@@ -618,12 +621,10 @@ export async function initDb() {
         rtsp_url: 'rtsp://admin:sits2026@192.168.1.101:554/h264Preview_01_main',
         onvif_port: 8000,
         stream_profile: '1080p_30fps_H264',
-        status: 'ONLINE',
-        last_seen: new Date().toISOString(),
-        latency_ms: 28,
-        fps: 30,
-        faces_detected_count: 142,
-        verified_attendance_count: 38,
+        status: 'OFFLINE',
+        fps: 0,
+        faces_detected_count: 0,
+        verified_attendance_count: 0,
         created_at: new Date().toISOString(),
       },
       {
@@ -638,12 +639,10 @@ export async function initDb() {
         rtsp_url: 'rtsp://admin:sits2026@192.168.1.102:554/live/ch0',
         onvif_port: 8000,
         stream_profile: '720p_25fps_H264',
-        status: 'ONLINE',
-        last_seen: new Date().toISOString(),
-        latency_ms: 34,
-        fps: 25,
-        faces_detected_count: 89,
-        verified_attendance_count: 24,
+        status: 'OFFLINE',
+        fps: 0,
+        faces_detected_count: 0,
+        verified_attendance_count: 0,
         created_at: new Date().toISOString(),
       },
       {
@@ -658,12 +657,10 @@ export async function initDb() {
         rtsp_url: 'rtsp://admin:sits2026@192.168.1.105:554/stream1',
         onvif_port: 8899,
         stream_profile: '1080p_wide_angle',
-        status: 'ONLINE',
-        last_seen: new Date().toISOString(),
-        latency_ms: 22,
-        fps: 30,
-        faces_detected_count: 210,
-        verified_attendance_count: 45,
+        status: 'OFFLINE',
+        fps: 0,
+        faces_detected_count: 0,
+        verified_attendance_count: 0,
         created_at: new Date().toISOString(),
       },
       {
@@ -678,12 +675,10 @@ export async function initDb() {
         rtsp_url: 'rtsp://admin:sits2026@192.168.2.110:554/profile1',
         onvif_port: 8000,
         stream_profile: '1080p_30fps',
-        status: 'ONLINE',
-        last_seen: new Date().toISOString(),
-        latency_ms: 31,
-        fps: 30,
-        faces_detected_count: 95,
-        verified_attendance_count: 32,
+        status: 'OFFLINE',
+        fps: 0,
+        faces_detected_count: 0,
+        verified_attendance_count: 0,
         created_at: new Date().toISOString(),
       },
     ];
@@ -709,10 +704,80 @@ export async function initDb() {
     writeJsonFile(RECOGNITION_EVENTS_FILE, []);
   }
 
-  // 10. AI Insights
-  let insights = readJsonFile<AiInsight[]>(AI_INSIGHTS_FILE, []);
-  if (insights.length === 0) {
-    writeJsonFile(AI_INSIGHTS_FILE, []);
+  // 11. Campus IoT Hardware Registry (Strict Anti-Fake: Initial status OFFLINE)
+  let campusDevices = readJsonFile<CampusDevice[]>(CAMPUS_DEVICES_FILE, []);
+  if (campusDevices.length === 0) {
+    campusDevices = [
+      {
+        id: 'ESP32-C204-01',
+        name: 'C-204 ESP32 Environmental & Occupancy Gateway',
+        category: 'ESP32_GATEWAY',
+        device_type: 'ESP32 NodeMCU (DHT22 + MQ-135 + PIR Occupancy)',
+        classroom: 'LH-301',
+        building: 'Sir C.V. Raman Block',
+        department: 'Computer Science & Engineering',
+        protocol: 'HTTPS_REST',
+        ip_or_hostname: '192.168.1.50',
+        mac_or_uuid: '24:6F:28:B4:7C:10',
+        device_token: 'sits_iot_c204_live',
+        status: 'OFFLINE',
+        capabilities: ['TEMPERATURE', 'HUMIDITY', 'CO2', 'OCCUPANCY', 'NOISE_LEVEL'],
+        created_at: new Date().toISOString(),
+        registered_by: 'system_bootstrap',
+      },
+      {
+        id: 'BLE-C204-ENV',
+        name: 'LH-301 BLE Environmental Beacon',
+        category: 'BLE_SENSOR',
+        device_type: 'Nordic nRF52840 Environmental GATT Sensor',
+        classroom: 'LH-301',
+        building: 'Sir C.V. Raman Block',
+        department: 'Computer Science & Engineering',
+        protocol: 'BLE_GATT',
+        mac_or_uuid: 'E4:5F:01:23:45:67',
+        device_token: 'sits_ble_c204_token',
+        status: 'OFFLINE',
+        capabilities: ['TEMPERATURE', 'HUMIDITY'],
+        created_at: new Date().toISOString(),
+        registered_by: 'system_bootstrap',
+      },
+      {
+        id: 'ESP32-LH101-01',
+        name: 'LH-101 ESP32 Air & Occupancy Node',
+        category: 'ESP32_GATEWAY',
+        device_type: 'ESP32 WROOM (BME280 + SGP30 + PIR)',
+        classroom: 'LH-101',
+        building: 'Main Academic Block',
+        department: 'Computer Science & Engineering',
+        protocol: 'HTTPS_REST',
+        ip_or_hostname: '192.168.1.51',
+        mac_or_uuid: '30:AE:A4:07:0D:64',
+        device_token: 'sits_iot_lh101_token',
+        status: 'OFFLINE',
+        capabilities: ['TEMPERATURE', 'HUMIDITY', 'CO2', 'OCCUPANCY'],
+        created_at: new Date().toISOString(),
+        registered_by: 'system_bootstrap',
+      },
+      {
+        id: 'ESP32-LH201-01',
+        name: 'LH-201 Smart Classroom Environmental Hub',
+        category: 'ESP32_GATEWAY',
+        device_type: 'ESP32-S3 AI Vision & Environmental Node',
+        classroom: 'LH-201',
+        building: 'Dr. A.P.J. Abdul Kalam Block',
+        department: 'Electronics & Communication Engineering',
+        protocol: 'WEBSOCKET',
+        ip_or_hostname: '192.168.2.55',
+        mac_or_uuid: '84:CC:A8:80:12:34',
+        device_token: 'sits_iot_lh201_token',
+        status: 'OFFLINE',
+        capabilities: ['TEMPERATURE', 'HUMIDITY', 'CO2', 'OCCUPANCY', 'NOISE_LEVEL'],
+        created_at: new Date().toISOString(),
+        registered_by: 'system_bootstrap',
+      },
+    ];
+    writeJsonFile(CAMPUS_DEVICES_FILE, campusDevices);
+    console.log('[DB] Seeded campus IoT hardware registry in strictly OFFLINE status.');
   }
 }
 

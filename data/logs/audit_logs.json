@@ -1,0 +1,38 @@
+[
+  {
+    "id": "log_1788457251754_w19du",
+    "timestamp": "2026-09-03T17:40:51.754Z",
+    "action": "USER_LOGIN",
+    "performed_by": "admin",
+    "actor_id": "usr_admin_01",
+    "actor_role": "ADMIN",
+    "target_type": "USER",
+    "target_id": "usr_admin_01",
+    "ip_address": "127.0.0.1",
+    "details": "User admin (ADMIN) logged in successfully."
+  },
+  {
+    "id": "log_1788459479725_utd6e",
+    "timestamp": "2026-09-03T18:17:59.725Z",
+    "action": "USER_LOGIN",
+    "performed_by": "admin",
+    "actor_id": "usr_admin_01",
+    "actor_role": "ADMIN",
+    "target_type": "USER",
+    "target_id": "usr_admin_01",
+    "ip_address": "127.0.0.1",
+    "details": "User admin (ADMIN) logged in successfully."
+  },
+  {
+    "id": "log_1788459483503_63spk",
+    "timestamp": "2026-09-03T18:18:03.503Z",
+    "action": "USER_LOGIN",
+    "performed_by": "admin",
+    "actor_id": "usr_admin_01",
+    "actor_role": "ADMIN",
+    "target_type": "USER",
+    "target_id": "usr_admin_01",
+    "ip_address": "127.0.0.1",
+    "details": "User admin (ADMIN) logged in successfully."
+  }
+]

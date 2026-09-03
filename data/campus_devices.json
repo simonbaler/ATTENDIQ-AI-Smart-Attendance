@@ -1,0 +1,142 @@
+[
+  {
+    "id": "ESP32-C204-01",
+    "name": "C-204 ESP32 Environmental & Occupancy Gateway",
+    "category": "ESP32_GATEWAY",
+    "device_type": "ESP32 NodeMCU (DHT22 + MQ-135 + PIR Occupancy)",
+    "classroom": "LH-301",
+    "building": "Sir C.V. Raman Block",
+    "department": "Computer Science & Engineering",
+    "protocol": "HTTPS_REST",
+    "ip_or_hostname": "192.168.1.50",
+    "mac_or_uuid": "24:6F:28:B4:7C:10",
+    "device_token": "sits_iot_c204_live",
+    "status": "OFFLINE",
+    "capabilities": [
+      "TEMPERATURE",
+      "HUMIDITY",
+      "CO2",
+      "OCCUPANCY",
+      "NOISE_LEVEL"
+    ],
+    "created_at": "2026-09-03T18:16:59.589Z",
+    "registered_by": "system_bootstrap",
+    "telemetry": {
+      "temperature_c": 24.8,
+      "humidity_pct": 54,
+      "noise_db": 41.5,
+      "occupancy_count": 32,
+      "battery_pct": 98,
+      "device_timestamp": "2026-09-03T18:17:15.000Z",
+      "server_timestamp": "2026-09-03T18:17:13.826Z",
+      "received_at": "2026-09-03T18:17:13.827Z"
+    },
+    "last_heartbeat": "2026-09-03T18:18:29.596Z"
+  },
+  {
+    "id": "BLE-C204-ENV",
+    "name": "LH-301 BLE Environmental Beacon",
+    "category": "BLE_SENSOR",
+    "device_type": "Nordic nRF52840 Environmental GATT Sensor",
+    "classroom": "LH-301",
+    "building": "Sir C.V. Raman Block",
+    "department": "Computer Science & Engineering",
+    "protocol": "BLE_GATT",
+    "mac_or_uuid": "E4:5F:01:23:45:67",
+    "device_token": "sits_ble_c204_token",
+    "status": "OFFLINE",
+    "capabilities": [
+      "TEMPERATURE",
+      "HUMIDITY"
+    ],
+    "created_at": "2026-09-03T18:16:59.589Z",
+    "registered_by": "system_bootstrap"
+  },
+  {
+    "id": "ESP32-LH101-01",
+    "name": "LH-101 ESP32 Air & Occupancy Node",
+    "category": "ESP32_GATEWAY",
+    "device_type": "ESP32 WROOM (BME280 + SGP30 + PIR)",
+    "classroom": "LH-101",
+    "building": "Main Academic Block",
+    "department": "Computer Science & Engineering",
+    "protocol": "HTTPS_REST",
+    "ip_or_hostname": "192.168.1.51",
+    "mac_or_uuid": "30:AE:A4:07:0D:64",
+    "device_token": "sits_iot_lh101_token",
+    "status": "OFFLINE",
+    "capabilities": [
+      "TEMPERATURE",
+      "HUMIDITY",
+      "CO2",
+      "OCCUPANCY"
+    ],
+    "created_at": "2026-09-03T18:16:59.589Z",
+    "registered_by": "system_bootstrap",
+    "telemetry": {
+      "temperature_c": 23.9,
+      "humidity_pct": 50,
+      "co2_ppm": 420,
+      "occupancy_count": 40,
+      "device_timestamp": "2026-09-03T18:17:30.000Z",
+      "server_timestamp": "2026-09-03T18:17:28.823Z",
+      "raw_payload": {
+        "deviceId": "ESP32-LH101-01",
+        "token": "sits_iot_lh101_token",
+        "classroom": "LH-101",
+        "timestamp": "2026-09-03T18:17:30.000Z",
+        "sensors": {
+          "temperature_c": 23.9,
+          "humidity_percent": 50,
+          "air_quality": 420,
+          "occupancy": 40
+        }
+      },
+      "received_at": "2026-09-03T18:17:28.823Z"
+    },
+    "last_heartbeat": "2026-09-03T18:18:29.596Z"
+  },
+  {
+    "id": "ESP32-LH201-01",
+    "name": "LH-201 Smart Classroom Environmental Hub",
+    "category": "ESP32_GATEWAY",
+    "device_type": "ESP32-S3 AI Vision & Environmental Node",
+    "classroom": "LH-201",
+    "building": "Dr. A.P.J. Abdul Kalam Block",
+    "department": "Electronics & Communication Engineering",
+    "protocol": "WEBSOCKET",
+    "ip_or_hostname": "192.168.2.55",
+    "mac_or_uuid": "84:CC:A8:80:12:34",
+    "device_token": "sits_iot_lh201_token",
+    "status": "OFFLINE",
+    "capabilities": [
+      "TEMPERATURE",
+      "HUMIDITY",
+      "CO2",
+      "OCCUPANCY",
+      "NOISE_LEVEL"
+    ],
+    "created_at": "2026-09-03T18:16:59.589Z",
+    "registered_by": "system_bootstrap",
+    "last_heartbeat": "2026-09-03T18:20:10.177Z",
+    "telemetry": {
+      "received_at": "2026-09-03T18:20:10.089Z",
+      "temperature_c": 25.4,
+      "humidity_pct": 49,
+      "co2_ppm": 470,
+      "noise_db": 42,
+      "occupancy_count": 36,
+      "raw_payload": {
+        "type": "TELEMETRY",
+        "device_id": "ESP32-LH201-01",
+        "data": {
+          "temperature_c": 25.4,
+          "humidity_percent": 49,
+          "co2_ppm": 470,
+          "occupancy": 36,
+          "noise_db": 42
+        }
+      }
+    }
+  }
+]

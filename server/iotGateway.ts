@@ -4,7 +4,19 @@ import { db, CampusDevice, DeviceTelemetry, DeviceStatus } from './db.js';
 
 export interface DeviceEventLog {
   id: string;
-  type: 'DEVICE_CONNECTED' | 'DEVICE_DISCONNECTED' | 'TELEMETRY_RECEIVED' | 'SENSOR_WARNING' | 'HEARTBEAT' | 'CORRELATION_WARNING' | 'DEVICE_REGISTERED';
+  type:
+    | 'DEVICE_CONNECTED'
+    | 'DEVICE_DISCONNECTED'
+    | 'DEVICE_ONLINE'
+    | 'DEVICE_OFFLINE'
+    | 'DEVICE_ERROR'
+    | 'DEVICE_HEARTBEAT'
+    | 'TELEMETRY_RECEIVED'
+    | 'SENSOR_WARNING'
+    | 'HEARTBEAT'
+    | 'CORRELATION_WARNING'
+    | 'DEVICE_REGISTERED'
+    | string;
   device_id: string;
   device_name: string;
   classroom: string;
@@ -202,8 +214,23 @@ export function createIoTGatewayServer(): WebSocketServer {
         const message = JSON.parse(dataRaw.toString());
         const { type } = message;
 
-        // Check if this is a hardware client
-        const hwClient = hardwareClients.get(ws);
+        // Check if this is a hardware client or an incoming AUTH message
+        let hwClient = hardwareClients.get(ws);
+        if (!hwClient && type === 'AUTH') {
+          hwClient = {
+            ws,
+            deviceId: message.deviceId || message.device_id || '',
+            classroom: '',
+            deviceToken: message.token || message.device_token || '',
+            authenticated: false,
+            connectedAt: new Date().toISOString(),
+          };
+          hardwareClients.set(ws, hwClient);
+          for (const d of dashboardClients) {
+            if (d.ws === ws) dashboardClients.delete(d);
+          }
+        }
+
         if (hwClient) {
           handleHardwareMessage(ws, hwClient, message);
           return;
@@ -262,6 +289,14 @@ export function createIoTGatewayServer(): WebSocketServer {
             message: `Hardware device ${hwClient.deviceId} disconnected from WebSocket gateway.`,
             severity: 'warning',
           });
+          recordDeviceEvent({
+            type: 'DEVICE_OFFLINE',
+            device_id: hwClient.deviceId,
+            device_name: hwClient.deviceId,
+            classroom: hwClient.classroom || 'Unknown',
+            message: `Hardware device ${hwClient.deviceId} status changed to OFFLINE.`,
+            severity: 'warning',
+          });
         }
       }
     });
@@ -287,11 +322,11 @@ export function createIoTGatewayServer(): WebSocketServer {
             db.updateDeviceHeartbeat(dev.id, 'OFFLINE');
             notifyDeviceStatus(dev.id, 'OFFLINE', dev.classroom, dev.department);
             recordDeviceEvent({
-              type: 'DEVICE_DISCONNECTED',
+              type: 'DEVICE_OFFLINE',
               device_id: dev.id,
               device_name: dev.name,
               classroom: dev.classroom,
-              message: `Hardware node ${dev.name} missed heartbeat window (>60s). Status changed to OFFLINE.`,
+              message: `Hardware node ${dev.name} missed heartbeat window (>60s). Status transitioned to OFFLINE.`,
               severity: 'warning',
             });
           }
@@ -309,11 +344,27 @@ function authenticateHardware(ws: WebSocket, deviceId: string, token: string) {
   const device = db.getCampusDeviceById(deviceId);
   if (!device) {
     ws.send(JSON.stringify({ type: 'AUTH_FAILED', message: 'Device ID not found in institutional registry.' }));
+    recordDeviceEvent({
+      type: 'DEVICE_ERROR',
+      device_id: deviceId,
+      device_name: deviceId,
+      classroom: 'Unknown',
+      message: `Unauthorized hardware connection attempt with unrecognized ID: ${deviceId}`,
+      severity: 'error',
+    });
     return false;
   }
 
   if (device.device_token && device.device_token !== token) {
     ws.send(JSON.stringify({ type: 'AUTH_FAILED', message: 'Invalid device credentials / token.' }));
+    recordDeviceEvent({
+      type: 'DEVICE_ERROR',
+      device_id: device.id,
+      device_name: device.name,
+      classroom: device.classroom,
+      message: `Authentication failed for device ${device.name}: Invalid token.`,
+      severity: 'error',
+    });
     return false;
   }
 
@@ -337,6 +388,15 @@ function authenticateHardware(ws: WebSocket, deviceId: string, token: string) {
     severity: 'success',
   });
 
+  recordDeviceEvent({
+    type: 'DEVICE_ONLINE',
+    device_id: device.id,
+    device_name: device.name,
+    classroom: device.classroom,
+    message: `Physical device ${device.name} is now ONLINE.`,
+    severity: 'success',
+  });
+
   ws.send(JSON.stringify({
     type: 'AUTH_SUCCESS',
     device_id: device.id,
@@ -351,7 +411,9 @@ function authenticateHardware(ws: WebSocket, deviceId: string, token: string) {
 }
 
 function handleHardwareMessage(ws: WebSocket, client: HardwareClient, message: any) {
-  const { type, deviceId, token } = message;
+  const deviceId = message.deviceId || message.device_id;
+  const token = message.token || message.device_token || message.apiKey;
+  const type = message.type;
 
   if (type === 'AUTH') {
     authenticateHardware(ws, deviceId || client.deviceId, token || client.deviceToken);
@@ -375,18 +437,19 @@ function handleHardwareMessage(ws: WebSocket, client: HardwareClient, message: a
     case 'TELEMETRY': {
       const { sensors, temperature_c, humidity_pct, co2_ppm, pm25, pm10, voc_ppb, noise_db, occupancy_count, battery_pct, rssi_dbm, raw_payload } = message;
 
-      const sensorData = sensors || {
-        temperature_c,
-        humidity_pct,
-        co2_ppm,
-        pm25,
-        pm10,
-        voc_ppb,
-        noise_db,
-        occupancy_count,
-        battery_pct,
-        rssi_dbm,
-        raw_payload,
+      const rawSensors = sensors || message.data || {};
+      const sensorData = {
+        temperature_c: rawSensors.temperature_c ?? temperature_c,
+        humidity_pct: rawSensors.humidity_pct ?? rawSensors.humidity_percent ?? humidity_pct,
+        co2_ppm: rawSensors.co2_ppm ?? rawSensors.air_quality ?? co2_ppm,
+        pm25: rawSensors.pm25 ?? pm25,
+        pm10: rawSensors.pm10 ?? pm10,
+        voc_ppb: rawSensors.voc_ppb ?? voc_ppb,
+        noise_db: rawSensors.noise_db ?? noise_db,
+        occupancy_count: rawSensors.occupancy_count ?? rawSensors.occupancy ?? occupancy_count,
+        battery_pct: rawSensors.battery_pct ?? rawSensors.battery_percent ?? battery_pct,
+        rssi_dbm: rawSensors.rssi_dbm ?? rssi_dbm,
+        raw_payload: raw_payload || message,
       };
 
       const recordRes = db.recordDeviceTelemetry(targetDeviceId, sensorData);
@@ -419,7 +482,17 @@ function handleHardwareMessage(ws: WebSocket, client: HardwareClient, message: a
     }
 
     case 'HEARTBEAT': {
+      const dev = db.getCampusDeviceById(targetDeviceId);
       db.updateDeviceHeartbeat(targetDeviceId, 'ONLINE');
+      notifyDeviceStatus(targetDeviceId, 'ONLINE', client.classroom, dev?.department);
+      recordDeviceEvent({
+        type: 'DEVICE_HEARTBEAT',
+        device_id: targetDeviceId,
+        device_name: dev?.name || targetDeviceId,
+        classroom: client.classroom || dev?.classroom || 'Unknown',
+        message: `Heartbeat acknowledged via WebSocket from ${dev?.name || targetDeviceId}.`,
+        severity: 'info',
+      });
       ws.send(JSON.stringify({
         type: 'HEARTBEAT_ACK',
         device_id: targetDeviceId,
