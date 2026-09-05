@@ -794,23 +794,23 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
   return (
     <div id="camera-view-container" className="space-y-6">
       {/* Top Header & Mode Selector */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
+      <div className="apple-card p-5 bg-white border border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+          <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
             <Camera className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-base font-bold text-white tracking-wide">
+              <h2 className="text-base font-bold text-gray-900 tracking-tight">
                 Live Attendance Vision Stream
               </h2>
               {activeSession && (
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full animate-pulse">
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full animate-pulse">
                   ACTIVE SESSION
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-gray-500">
               {activeSession
                 ? activeSession.is_multi_department
                   ? `${activeSession.classroom} • ${activeSession.subject} • Multi-Dept (${activeSession.departments?.length || 0} Departments)`
@@ -823,7 +823,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Mode Switch: Mobile Phone vs Webcam */}
-          <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center space-x-1 text-xs">
+          <div className="bg-gray-100 p-1 rounded-full border border-gray-200 flex items-center space-x-1 text-xs">
             <button
               onClick={() => {
                 setCameraMode('MOBILE');
@@ -832,10 +832,10 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                   handleInitiatePairing();
                 }
               }}
-              className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-full font-medium transition flex items-center space-x-1.5 ${
                 cameraMode === 'MOBILE'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               <Smartphone className="w-3.5 h-3.5" />
@@ -848,10 +848,10 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                   startLocalCamera();
                 }
               }}
-              className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-full font-medium transition flex items-center space-x-1.5 ${
                 cameraMode === 'LOCAL'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               <Camera className="w-3.5 h-3.5" />
@@ -863,7 +863,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
             <button
               onClick={() => handleInitiatePairing()}
               disabled={pairingLoading}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition shadow-md shadow-purple-900/30"
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-xs font-semibold flex items-center space-x-1.5 transition shadow-xs"
             >
               <Smartphone className="w-3.5 h-3.5" />
               <span>
@@ -879,26 +879,26 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
           {/* Additional Campus Hardware & Telemetry Tools */}
           <button
             onClick={() => setShowSensorModal(true)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-700"
+            className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-full text-xs font-semibold flex items-center space-x-1.5 transition border border-gray-200"
             title="Campus BLE & Environmental Sensors"
           >
-            <Radio className="w-3.5 h-3.5 text-blue-400" />
+            <Radio className="w-3.5 h-3.5 text-indigo-600" />
             <span>Campus Sensors</span>
           </button>
 
           <button
             onClick={() => setShowObservabilityModal(true)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-700"
+            className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-full text-xs font-semibold flex items-center space-x-1.5 transition border border-gray-200"
             title="Live System Observability & Subsystems Health"
           >
-            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            <Activity className="w-3.5 h-3.5 text-blue-600" />
             <span>Diagnostics</span>
           </button>
 
           {activeSession && (
             <button
               onClick={handleStopSession}
-              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition shadow-sm"
+              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-semibold flex items-center space-x-1.5 transition shadow-xs"
             >
               <Square className="w-3.5 h-3.5" />
               <span>End Session</span>
@@ -911,21 +911,21 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Col (2 cols): Video Canvas Stream Viewport */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="relative bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col items-center justify-center min-h-[440px] max-h-[560px]">
+          <div className="relative bg-black rounded-2xl overflow-hidden shadow-md flex flex-col items-center justify-center min-h-[440px] max-h-[560px]">
             {/* Top Left Live Status HUD */}
             <div className="absolute top-3 left-3 z-20 flex items-center space-x-2">
               <div
-                className={`px-2.5 py-1 rounded-md text-xs font-mono backdrop-blur-md flex items-center space-x-1.5 shadow-sm ${
+                className={`px-2.5 py-1 rounded-full text-xs font-mono backdrop-blur-md flex items-center space-x-1.5 shadow-sm ${
                   (cameraMode === 'LOCAL' && cameraActive) || (cameraMode === 'MOBILE' && mobileStreamActive)
-                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
-                    : 'bg-slate-900/80 text-slate-400 border border-slate-700'
+                    ? 'bg-black/60 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-black/60 text-gray-300 border border-gray-700'
                 }`}
               >
                 <span
                   className={`w-2 h-2 rounded-full ${
                     (cameraMode === 'LOCAL' && cameraActive) || (cameraMode === 'MOBILE' && mobileStreamActive)
                       ? 'bg-emerald-400 animate-pulse'
-                      : 'bg-slate-500'
+                      : 'bg-gray-500'
                   }`}
                 />
                 <span>
@@ -942,17 +942,17 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
               </div>
 
               {cameraMode === 'MOBILE' && (
-                <div className="px-2 py-1 rounded-md text-xs bg-purple-950/80 text-purple-300 border border-purple-700 backdrop-blur-md font-mono flex items-center space-x-1">
-                  <Smartphone className="w-3 h-3 text-purple-400" />
+                <div className="px-2 py-1 rounded-full text-xs bg-black/60 text-indigo-300 border border-indigo-500/40 backdrop-blur-md font-mono flex items-center space-x-1">
+                  <Smartphone className="w-3 h-3 text-indigo-400" />
                   <span>{mobileWebRTCState}</span>
                 </div>
               )}
 
               {((cameraMode === 'LOCAL' && cameraActive) || (cameraMode === 'MOBILE' && mobileStreamActive)) && (
-                <div className="flex items-center space-x-1 px-2 py-1 rounded-md text-xs bg-slate-900/80 text-slate-300 border border-slate-700 backdrop-blur-md font-mono">
+                <div className="flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs bg-black/60 text-gray-200 border border-gray-700 backdrop-blur-md font-mono">
                   <Activity className="w-3 h-3 text-blue-400" />
                   <span>{fps} FPS</span>
-                  <span className="text-slate-500">•</span>
+                  <span className="text-gray-500">•</span>
                   <span>{lastFrameLatency}ms</span>
                 </div>
               )}
@@ -960,11 +960,11 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
 
             {/* Top Right Anti-Spoof & Tracks HUD */}
             <div className="absolute top-3 right-3 z-20 flex items-center space-x-2">
-              <div className="px-2.5 py-1 rounded-md text-xs bg-slate-900/80 text-emerald-300 border border-emerald-500/30 backdrop-blur-md flex items-center space-x-1 font-mono">
+              <div className="px-2.5 py-1 rounded-full text-xs bg-black/60 text-emerald-400 border border-emerald-500/40 backdrop-blur-md flex items-center space-x-1 font-mono">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Anti-Spoof ON</span>
               </div>
-              <div className="px-2.5 py-1 rounded-md text-xs bg-slate-900/80 text-slate-200 border border-slate-700 backdrop-blur-md font-mono">
+              <div className="px-2.5 py-1 rounded-full text-xs bg-black/60 text-white border border-gray-700 backdrop-blur-md font-mono">
                 Faces: <span className="text-blue-400 font-bold">{detectedFaces.length}</span>
               </div>
             </div>
@@ -1006,12 +1006,12 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
 
                 {!mobileStreamActive && (
                   <div className="p-8 text-center max-w-md space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto text-purple-400">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
                       <Smartphone className="w-8 h-8" />
                     </div>
                     <div className="space-y-2">
                       <h3 className="text-base font-bold text-white">Mobile Camera Not Connected</h3>
-                      <p className="text-xs text-slate-400 leading-relaxed">
+                      <p className="text-xs text-gray-400 leading-relaxed">
                         {mobileStateDetails || 'Connect your smartphone camera to stream live classroom video directly into the attendance recognition pipeline.'}
                       </p>
                     </div>
@@ -1019,9 +1019,9 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                       <button
                         onClick={() => handleInitiatePairing()}
                         disabled={pairingLoading}
-                        className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-purple-600/30 inline-flex items-center space-x-2.5 transition active:scale-95"
+                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm font-semibold shadow-md inline-flex items-center space-x-2 transition"
                       >
-                        <QrCode className="w-5 h-5" />
+                        <QrCode className="w-4 h-4" />
                         <span>Connect Mobile Camera</span>
                       </button>
                     </div>
@@ -1033,22 +1033,22 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
             {/* Standby / Error Screen for Local Camera */}
             {cameraMode === 'LOCAL' && !cameraActive && (
               <div className="p-6 sm:p-8 text-center max-w-md">
-                <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto mb-4 text-slate-500">
+                <div className="w-16 h-16 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center mx-auto mb-4 text-gray-400">
                   <Camera className="w-8 h-8" />
                 </div>
                 {cameraError ? (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-center space-x-2 text-rose-400 font-semibold text-sm">
+                    <div className="flex items-center justify-center space-x-2 text-red-400 font-semibold text-sm">
                       <AlertCircle className="w-4 h-4" />
                       <span>Camera Access Notification</span>
                     </div>
-                    <p className="text-xs text-slate-400 leading-relaxed bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                    <p className="text-xs text-gray-300 leading-relaxed bg-gray-900 p-3 rounded-xl border border-gray-800">
                       {cameraError}
                     </p>
                     <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={startLocalCamera}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow transition"
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-semibold shadow-xs transition"
                       >
                         Retry Camera Access
                       </button>
@@ -1056,14 +1056,14 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <h3 className="text-base font-bold text-slate-200">Classroom Webcam is Idle</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
+                    <h3 className="text-base font-bold text-white">Classroom Webcam is Idle</h3>
+                    <p className="text-xs text-gray-400 leading-relaxed">
                       Click below to activate local webcam. The system detects human faces in real time and automatically marks verified attendance.
                     </p>
                     <button
                       onClick={startLocalCamera}
                       disabled={modelsLoading}
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow transition inline-flex items-center justify-center space-x-2 disabled:opacity-50"
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-semibold shadow-xs transition inline-flex items-center justify-center space-x-2 disabled:opacity-50"
                     >
                       <Camera className="w-4 h-4" />
                       <span>{modelsLoading ? 'Loading AI Models...' : 'Start Classroom Webcam'}</span>
@@ -1084,16 +1084,16 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
           </div>
 
           {/* AI Recognition Engine Rules Notice */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-3.5 text-xs text-slate-400 space-y-1.5">
-            <div className="flex items-center space-x-2 font-semibold text-slate-300">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+          <div className="apple-card p-4 bg-white border border-gray-200 text-xs text-gray-600 space-y-1.5">
+            <div className="flex items-center space-x-2 font-semibold text-gray-900">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
               <span>SITS Multi-Stage Intelligence & Anti-Spoofing Pipeline</span>
             </div>
-            <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1">
-              <li><strong className="text-slate-300">Multi-Face Auto-Crop Vision:</strong> Concurrently tracks and extracts embeddings for all students in wide classroom views.</li>
-              <li><strong className="text-slate-300">Passive Liveness Detection:</strong> Micro-motion variance filters out printed photographs and static digital screens.</li>
-              <li><strong className="text-slate-300">Adaptive Temporal Confirmation:</strong> High confidence matches confirm in 3 frames; marginal matches confirm in 5 frames.</li>
-              <li><strong className="text-slate-300">Duplicate Guard:</strong> Attendance is marked only once per student per active session.</li>
+            <ul className="list-disc list-inside space-y-1 text-gray-500 pl-1">
+              <li><strong className="text-gray-800">Multi-Face Auto-Crop Vision:</strong> Concurrently tracks and extracts embeddings for all students in wide classroom views.</li>
+              <li><strong className="text-gray-800">Passive Liveness Detection:</strong> Micro-motion variance filters out printed photographs and static digital screens.</li>
+              <li><strong className="text-gray-800">Adaptive Temporal Confirmation:</strong> High confidence matches confirm in 3 frames; marginal matches confirm in 5 frames.</li>
+              <li><strong className="text-gray-800">Duplicate Guard:</strong> Attendance is marked only once per student per active session.</li>
             </ul>
           </div>
         </div>
@@ -1102,16 +1102,16 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
         <div className="space-y-4">
           {/* Department Intelligence Roster Card */}
           {activeSession && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <div className="apple-card p-5 bg-white border border-gray-200 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                 <div className="flex items-center space-x-2">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
                     {activeSession.is_multi_department ? 'Department-Wise Live Attendance' : 'Session Attendance Status'}
                   </h3>
                 </div>
                 {sessionStats && (
-                  <span className="text-xs font-mono font-bold text-emerald-400">
+                  <span className="text-xs font-mono font-bold text-emerald-600">
                     {sessionStats.present} / {sessionStats.total} ({sessionStats.percentage}%)
                   </span>
                 )}
@@ -1131,16 +1131,16 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                       <div key={deptName} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center space-x-1.5">
-                            <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-emerald-300 font-bold">
+                            <span className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] font-mono text-blue-700 font-bold">
                               {deptCode}
                             </span>
-                            <span className="text-slate-300 truncate text-[11px]">{deptName}</span>
+                            <span className="text-gray-700 truncate text-[11px] font-medium">{deptName}</span>
                           </div>
-                          <div className="font-mono text-slate-300 text-[11px]">
-                            <strong className="text-white">{stat.present}</strong> / {stat.total} ({stat.attendance_percentage}%)
+                          <div className="font-mono text-gray-600 text-[11px]">
+                            <strong className="text-gray-900">{stat.present}</strong> / {stat.total} ({stat.attendance_percentage}%)
                           </div>
                         </div>
-                        <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
                           <div
                             className="bg-emerald-500 h-full rounded-full transition-all duration-500"
                             style={{ width: `${Math.min(100, stat.attendance_percentage)}%` }}
@@ -1152,11 +1152,11 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                 </div>
               ) : sessionStats ? (
                 <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs text-slate-300">
+                  <div className="flex justify-between text-xs text-gray-600">
                     <span>Attendance Progress:</span>
-                    <span className="font-mono">{sessionStats.present} of {sessionStats.total} students</span>
+                    <span className="font-mono font-semibold text-gray-900">{sessionStats.present} of {sessionStats.total} students</span>
                   </div>
-                  <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                     <div
                       className="bg-emerald-500 h-full rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, sessionStats.percentage)}%` }}
@@ -1167,24 +1167,24 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
             </div>
           )}
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm flex flex-col h-[420px]">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="apple-card p-5 bg-white border border-gray-200 flex flex-col h-[440px]">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-purple-400" />
-                <h3 className="text-sm font-bold text-white">Live Attendance Stream</h3>
+                <Clock className="w-4 h-4 text-blue-600" />
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Live Attendance Stream</h3>
               </div>
-              <span className="text-[11px] font-mono text-slate-400">
+              <span className="text-[11px] font-mono text-gray-400">
                 {recentMarks.length} records marked
               </span>
             </div>
 
             {/* Feed List */}
-            <div className="flex-1 overflow-y-auto mt-3 space-y-2 pr-1 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto mt-3 space-y-2 pr-1">
               {recentMarks.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
-                  <UserCheck className="w-8 h-8 mb-2 opacity-40" />
-                  <p className="text-xs">No attendance marked yet in this session.</p>
-                  <p className="text-[11px] text-slate-600 mt-1">
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-400">
+                  <UserCheck className="w-8 h-8 mb-2 opacity-30" />
+                  <p className="text-xs font-medium text-gray-600">No attendance marked yet in this session.</p>
+                  <p className="text-[11px] text-gray-400 mt-1">
                     When registered students are recognized by the camera, verified records appear here.
                   </p>
                 </div>
@@ -1192,44 +1192,44 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                 recentMarks.map((mark) => (
                   <div
                     key={mark.id}
-                    className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg text-xs space-y-1 hover:border-slate-700 transition flex items-center space-x-3"
+                    className="p-3 bg-gray-50/70 border border-gray-200 rounded-xl text-xs space-y-1 hover:border-gray-300 transition flex items-center space-x-3"
                   >
                     {mark.cropUrl ? (
                       <img
                         src={mark.cropUrl}
                         alt={mark.name}
-                        className="w-11 h-11 rounded-lg object-cover border border-emerald-500/40 shrink-0"
+                        className="w-11 h-11 rounded-lg object-cover border border-emerald-300 shrink-0"
                       />
                     ) : (
-                      <div className="w-11 h-11 rounded-lg bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold shrink-0">
+                      <div className="w-11 h-11 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 font-bold shrink-0">
                         ✓
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-200 truncate">{mark.name}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 shrink-0">
+                        <span className="font-semibold text-gray-900 truncate">{mark.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 shrink-0">
                           PRESENT
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-slate-400 font-mono text-[11px]">
+                      <div className="flex items-center justify-between text-gray-500 font-mono text-[11px]">
                         <span>{mark.roll}</span>
-                        <span>{mark.confidence}% match</span>
+                        <span className="text-blue-600 font-semibold">{mark.confidence}% match</span>
                       </div>
-                      <div className="text-[10px] text-slate-500 flex items-center justify-between pt-0.5 font-mono">
+                      <div className="text-[10px] text-gray-400 flex items-center justify-between pt-0.5 font-mono">
                         <span className="flex items-center space-x-1">
                           {mark.source === 'MOBILE_CAMERA' ? (
-                            <span className="text-purple-400 flex items-center space-x-0.5">
+                            <span className="text-indigo-600 flex items-center space-x-0.5">
                               <Smartphone className="w-2.5 h-2.5" />
                               <span>Mobile</span>
                             </span>
                           ) : (
-                            <span className="text-blue-400 flex items-center space-x-0.5">
+                            <span className="text-blue-600 flex items-center space-x-0.5">
                               <Camera className="w-2.5 h-2.5" />
                               <span>Webcam</span>
                             </span>
                           )}
-                          <span className="text-slate-600">•</span>
+                          <span>•</span>
                           <span>{mark.trackingId || 'TRACK'}</span>
                         </span>
                         <span>{mark.time}</span>
@@ -1242,30 +1242,30 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
 
             {/* Currently in Camera Frame */}
             {detectedFaces.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-slate-800 text-xs">
-                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+              <div className="mt-3 pt-3 border-t border-gray-100 text-xs">
+                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                   Currently in Camera Frame ({detectedFaces.length}):
                 </div>
                 <div className="space-y-1 max-h-28 overflow-y-auto">
                   {detectedFaces.map((f, i) => (
                     <div
                       key={i}
-                      className={`px-2.5 py-1 rounded text-[11px] flex items-center justify-between ${
+                      className={`px-2.5 py-1 rounded-lg text-[11px] flex items-center justify-between ${
                         f.liveness?.spoof_suspected
-                          ? 'bg-red-950/60 text-red-300 border border-red-800/40'
+                          ? 'bg-red-50 text-red-700 border border-red-200'
                           : f.status === 'RECOGNIZED'
-                          ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-800/40'
-                          : 'bg-amber-950/50 text-amber-300 border border-amber-800/40'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}
                     >
-                      <span className="truncate">
+                      <span className="truncate font-medium">
                         {f.liveness?.spoof_suspected
                           ? `Spoof Alert (${f.tracking_id || 'Track'})`
                           : f.status === 'RECOGNIZED'
                           ? `${f.student?.full_name} (${f.tracking_id || 'Track'})`
                           : `Unknown Face (${f.tracking_id || 'Track'})`}
                       </span>
-                      <span className="font-mono text-[10px]">
+                      <span className="font-mono text-[10px] font-bold">
                         {f.liveness?.spoof_suspected
                           ? 'BLOCKED'
                           : f.status === 'RECOGNIZED'
@@ -1286,22 +1286,22 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
 
       {/* Mobile Camera Pairing Modal */}
       {showPairModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="apple-card p-6 sm:p-7 bg-white max-w-md w-full shadow-2xl space-y-5 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowPairModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                <Smartphone className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                <Smartphone className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Connect Mobile Camera</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="text-base font-bold text-gray-900">Connect Mobile Camera</h3>
+                <p className="text-xs text-gray-500">
                   Use your smartphone as the classroom AI camera.
                 </p>
               </div>
@@ -1309,19 +1309,19 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
 
             {pairingLoading ? (
               <div className="py-12 flex flex-col items-center justify-center space-y-3">
-                <RefreshCw className="w-8 h-8 text-purple-400 animate-spin" />
-                <p className="text-xs text-slate-400">Generating secure pairing session...</p>
+                <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+                <p className="text-xs text-gray-500">Generating secure pairing session...</p>
               </div>
             ) : pairingData ? (
               <div className="space-y-4">
                 {/* QR Code Container */}
-                <div className="bg-white p-3.5 rounded-2xl flex flex-col items-center justify-center shadow-xl mx-auto w-fit">
+                <div className="bg-white p-3.5 rounded-2xl border border-gray-200 flex flex-col items-center justify-center shadow-xs mx-auto w-fit">
                   <img
                     src={pairingData.qrDataUrl}
                     alt="Mobile Pairing QR Code"
                     className="w-56 h-56 rounded-lg object-contain"
                   />
-                  <div className="mt-2 text-[10px] font-bold tracking-wider text-slate-800 uppercase flex items-center space-x-1.5">
+                  <div className="mt-2 text-[10px] font-bold tracking-wider text-gray-600 uppercase flex items-center space-x-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span>Ready for smartphone scan</span>
                   </div>
@@ -1333,15 +1333,15 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                     <span
                       className={`w-2 h-2 rounded-full ${
                         mobileStreamActive
-                          ? 'bg-emerald-400 animate-pulse'
+                          ? 'bg-emerald-500 animate-pulse'
                           : mobileWebRTCState === 'CONNECTED'
-                          ? 'bg-blue-400'
+                          ? 'bg-blue-500'
                           : mobileWebRTCState === 'PHONE_SCANNED' || mobileWebRTCState === 'REQUESTING_CAMERA'
-                          ? 'bg-purple-400 animate-pulse'
-                          : 'bg-amber-400 animate-ping'
+                          ? 'bg-indigo-500 animate-pulse'
+                          : 'bg-amber-500 animate-ping'
                       }`}
                     />
-                    <span className="font-semibold text-slate-300">
+                    <span className="font-semibold text-gray-700">
                       {mobileStreamActive
                         ? 'Mobile camera connected ✓ (LIVE)'
                         : mobileWebRTCState === 'PHONE_SCANNED'
@@ -1357,7 +1357,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                   {pairingTimeLeft !== null && (
                     <span
                       className={`font-mono text-[11px] ${
-                        pairingTimeLeft < 60 ? 'text-rose-400 font-bold animate-pulse' : 'text-slate-400'
+                        pairingTimeLeft < 60 ? 'text-red-600 font-bold animate-pulse' : 'text-gray-400'
                       }`}
                     >
                       {pairingTimeLeft > 0
@@ -1370,34 +1370,34 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                 </div>
 
                 {/* 5-Step Numbered Guide */}
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 space-y-2">
-                  <div className="flex items-center space-x-2 text-purple-400 font-semibold text-xs">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3.5 text-xs text-gray-700 space-y-2">
+                  <div className="flex items-center space-x-2 text-indigo-700 font-semibold text-xs">
                     <Sparkles className="w-4 h-4" />
                     <span>How to connect in 5 seconds:</span>
                   </div>
-                  <ol className="space-y-1.5 text-[11px] text-slate-400 pl-1">
+                  <ol className="space-y-1 text-[11px] text-gray-600 pl-1">
                     <li className="flex items-start space-x-2">
-                      <span className="font-bold text-purple-400">1.</span>
+                      <span className="font-bold text-indigo-600">1.</span>
                       <span>Open your phone camera.</span>
                     </li>
                     <li className="flex items-start space-x-2">
-                      <span className="font-bold text-purple-400">2.</span>
+                      <span className="font-bold text-indigo-600">2.</span>
                       <span>Scan the QR code above.</span>
                     </li>
                     <li className="flex items-start space-x-2">
-                      <span className="font-bold text-purple-400">3.</span>
+                      <span className="font-bold text-indigo-600">3.</span>
                       <span>Open the ATTENDIQ link.</span>
                     </li>
                     <li className="flex items-start space-x-2">
-                      <span className="font-bold text-purple-400">4.</span>
+                      <span className="font-bold text-indigo-600">4.</span>
                       <span>Allow camera permission.</span>
                     </li>
                     <li className="flex items-start space-x-2">
-                      <span className="font-bold text-purple-400">5.</span>
+                      <span className="font-bold text-indigo-600">5.</span>
                       <span>Camera connects automatically.</span>
                     </li>
                   </ol>
-                  <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-900 font-medium">
+                  <p className="text-[10px] text-gray-400 pt-1 border-t border-gray-200 font-medium">
                     🔒 Secure temporary connection • No PIN required
                   </p>
                 </div>
@@ -1406,9 +1406,9 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => handleInitiatePairing()}
-                    className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center space-x-1.5"
+                    className="py-2 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-full transition flex items-center justify-center space-x-1.5"
                   >
-                    <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
+                    <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Generate New QR</span>
                   </button>
 
@@ -1418,16 +1418,16 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                       setCopiedUrl(true);
                       setTimeout(() => setCopiedUrl(false), 2500);
                     }}
-                    className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center space-x-1.5"
+                    className="py-2 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-full transition flex items-center justify-center space-x-1.5"
                   >
                     {copiedUrl ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">Copied!</span>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-600">Copied!</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5 text-slate-400" />
+                        <Copy className="w-3.5 h-3.5 text-gray-500" />
                         <span>Copy Mobile URL</span>
                       </>
                     )}
@@ -1438,7 +1438,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                   href={pairingData.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-2.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 text-xs font-semibold rounded-xl transition flex items-center justify-center space-x-2"
+                  className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-semibold rounded-full transition flex items-center justify-center space-x-2"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>Open on Phone / New Tab</span>
@@ -1449,19 +1449,19 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                   <button
                     type="button"
                     onClick={() => setShowDiagnostics(!showDiagnostics)}
-                    className="text-[11px] text-slate-500 hover:text-slate-400 flex items-center space-x-1 font-mono transition"
+                    className="text-[11px] text-gray-400 hover:text-gray-600 flex items-center space-x-1 font-mono transition"
                   >
                     <span>{showDiagnostics ? '▼ Hide Diagnostics' : '▶ Show WebRTC Diagnostics'}</span>
                   </button>
 
                   {showDiagnostics && (
-                    <div className="mt-2 p-3 bg-slate-950 rounded-xl border border-slate-800 text-[11px] font-mono space-y-1 text-slate-400">
-                      <div>Session ID: <span className="text-slate-300">{activeSession?.id || 'Auto-Provisioned'}</span></div>
-                      <div>Token Prefix: <span className="text-slate-300">{pairingData.token.slice(0, 10)}...</span></div>
-                      <div>Signaling: <span className="text-emerald-400">Connected (/api/mobile/signaling)</span></div>
-                      <div>WebRTC State: <span className="text-purple-400">{mobileWebRTCState}</span></div>
-                      <div>Stream Active: <span className={mobileStreamActive ? 'text-emerald-400' : 'text-slate-500'}>{mobileStreamActive ? 'YES' : 'NO'}</span></div>
-                      {pairingData.lanIp && <div>LAN IP: <span className="text-slate-300">{pairingData.lanIp}</span></div>}
+                    <div className="mt-2 p-3 bg-gray-50 rounded-xl border border-gray-200 text-[11px] font-mono space-y-1 text-gray-600">
+                      <div>Session ID: <span className="text-gray-900">{activeSession?.id || 'Auto-Provisioned'}</span></div>
+                      <div>Token Prefix: <span className="text-gray-900">{pairingData.token.slice(0, 10)}...</span></div>
+                      <div>Signaling: <span className="text-emerald-600">Connected (/api/mobile/signaling)</span></div>
+                      <div>WebRTC State: <span className="text-indigo-600">{mobileWebRTCState}</span></div>
+                      <div>Stream Active: <span className={mobileStreamActive ? 'text-emerald-600' : 'text-gray-400'}>{mobileStreamActive ? 'YES' : 'NO'}</span></div>
+                      {pairingData.lanIp && <div>LAN IP: <span className="text-gray-900">{pairingData.lanIp}</span></div>}
                     </div>
                   )}
                 </div>
@@ -1473,7 +1473,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                 setShowPairModal(false);
                 setCameraMode('MOBILE');
               }}
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition"
+              className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-full text-xs transition"
             >
               {mobileStreamActive ? 'View Live Classroom Feed' : 'Close Modal'}
             </button>

@@ -323,6 +323,7 @@ export interface CampusDevice {
   device_type: string;
   classroom: string;
   building: string;
+  room?: string;
   department: string;
   protocol: DeviceProtocol;
   ip_or_hostname?: string;
@@ -331,6 +332,7 @@ export interface CampusDevice {
   status: DeviceStatus;
   capabilities: string[];
   telemetry?: DeviceTelemetry;
+  device_role?: string;
   last_heartbeat?: string;
   last_seen?: string;
   last_error?: string;

@@ -231,6 +231,15 @@ export interface DeviceTelemetry {
   received_at: string;
 }
 
+export type DeviceRole =
+  | 'Attendance Camera'
+  | 'Occupancy Sensor'
+  | 'Environmental Sensor'
+  | 'Door Sensor'
+  | 'IoT Gateway'
+  | 'Classroom Display'
+  | string;
+
 export interface CampusDevice {
   id: string;
   name: string;
@@ -238,6 +247,7 @@ export interface CampusDevice {
   device_type: string;
   classroom: string;
   building: string;
+  room?: string;
   department: string;
   protocol: DeviceProtocol;
   ip_or_hostname?: string;
@@ -246,10 +256,67 @@ export interface CampusDevice {
   status: DeviceStatus;
   capabilities: string[];
   telemetry?: DeviceTelemetry;
+  device_role?: DeviceRole;
   last_heartbeat?: string;
+  last_seen?: string;
+  device_timestamp?: string;
+  server_timestamp?: string;
   last_error?: string;
   created_at: string;
   registered_by: string;
+}
+
+export interface HardwareCameraDevice {
+  deviceId: string;
+  label: string;
+  kind: 'videoinput';
+  groupId?: string;
+  type: 'Integrated Laptop Camera' | 'USB Webcam / External Camera' | 'Camera Device';
+  resolution?: { width: number; height: number };
+  fps?: number;
+  facingMode?: string;
+  permissionState: 'granted' | 'prompt' | 'denied';
+  isConnected: boolean;
+  isAttendanceSource: boolean;
+}
+
+export interface DiscoveredBluetoothDevice {
+  id: string;
+  name: string;
+  type:
+    | 'Mobile Phone'
+    | 'Camera'
+    | 'Headset'
+    | 'Speaker'
+    | 'BLE Beacon'
+    | 'Environmental Sensor'
+    | 'ESP32'
+    | 'Arduino-compatible BLE device'
+    | 'Unknown Bluetooth Device';
+  connectionState: 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'ERROR';
+  rssi?: number;
+  estimatedRange?: string; // e.g. "Estimated: ~2.4m" or "Range unavailable"
+  battery?: number;
+  services: string[];
+  manufacturerInfo?: string;
+  lastSeen: string;
+  deviceObj?: any;
+  gattServer?: any;
+}
+
+export interface ClassroomAssignment {
+  deviceId: string;
+  deviceName: string;
+  building: string;
+  room: string;
+  classroom: string;
+  deviceRole:
+    | 'Attendance Camera'
+    | 'Occupancy Sensor'
+    | 'Environmental Sensor'
+    | 'Door Sensor'
+    | 'IoT Gateway'
+    | 'Classroom Display';
 }
 
 export interface SmartClassroomCorrelation {

@@ -119,38 +119,36 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Command Center Hero & System Status */}
-      <div className="relative overflow-hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+      {/* Command Center Hero & System Status Header */}
+      <div className="apple-card p-6 sm:p-7 bg-white relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold border border-blue-500/20">
-                <Sparkles className="w-3.5 h-3.5" />
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                 <span>AI COMMAND CENTER — MULTI-DEPARTMENT INTELLIGENCE</span>
               </div>
 
               <div
-                className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
                   isLive
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 animate-pulse'
-                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-gray-50 text-gray-600 border-gray-200'
                 }`}
               >
                 <div
                   className={`w-2 h-2 rounded-full ${
-                    isLive ? 'bg-emerald-400' : 'bg-slate-500'
+                    isLive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
                   }`}
                 />
                 <span>{isLive ? 'LIVE RECOGNITION ACTIVE' : 'SYSTEM READY / IDLE'}</span>
               </div>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
               {isAdmin ? 'Institutional AI Attendance Command Center' : `${user?.department} — Live Attendance Command`}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-3xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-gray-600 max-w-3xl leading-relaxed">
               Real-time multi-department classroom attendance, 128D neural verification, Google Sheets authoritative roster sync, and live department-wise intelligence counters.
             </p>
           </div>
@@ -159,7 +157,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => onNavigate('live-camera')}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-600/20 transition flex items-center space-x-2 active:scale-95"
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs sm:text-sm font-semibold shadow-xs transition flex items-center space-x-2"
             >
               <Camera className="w-4 h-4" />
               <span>Launch Live Camera</span>
@@ -168,7 +166,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
             {onTriggerMobilePair && (
               <button
                 onClick={onTriggerMobilePair}
-                className="px-3.5 py-2.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5"
+                className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5"
                 title="Pair Smartphone WebRTC Camera via QR Code"
               >
                 <QrCode className="w-4 h-4" />
@@ -179,7 +177,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
             {onOpenSheetsSync && (
               <button
                 onClick={onOpenSheetsSync}
-                className="px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5"
+                className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5"
                 title="Sync Authoritative Roster with Google Sheets"
               >
                 <FileSpreadsheet className="w-4 h-4" />
@@ -189,7 +187,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
 
             <button
               onClick={handleManualRefresh}
-              className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl transition"
+              className="p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-full transition"
               title="Refresh Command Center Data"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -198,28 +196,28 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         </div>
       </div>
 
-      {/* 10 Institutional Status Cards Grid */}
+      {/* 10 Institutional Status Cards Grid (Ecommerce-style Usability) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Card 1: Live Attendance */}
         <div
           onClick={() => onNavigate('live-camera')}
-          className="bg-slate-900 border border-slate-800 hover:border-blue-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-blue-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">1. Live Attendance</span>
-            <div className={`p-1.5 rounded-lg border ${isLive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+            <span className="text-xs font-bold text-gray-500">1. Live Attendance</span>
+            <div className={`p-2 rounded-xl ${isLive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
               <Video className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-xl font-black text-white flex items-center space-x-2">
+            <div className="text-xl font-extrabold text-gray-900 flex items-center space-x-2">
               <span>{commandData?.live_attendance.status || 'IDLE'}</span>
-              {isLive && <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">ONLINE</span>}
+              {isLive && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">ONLINE</span>}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 truncate">
+            <p className="text-xs text-gray-500 mt-1 truncate font-medium">
               {commandData?.live_attendance.active_session_name || 'No active session'}
             </p>
-            <div className="mt-2 text-[10px] text-slate-500 font-mono">
+            <div className="mt-2 text-[11px] text-gray-400 font-mono">
               {commandData?.live_attendance.total_markings_today || 0} today records
             </div>
           </div>
@@ -228,23 +226,23 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Card 2: Students Present */}
         <div
           onClick={() => onNavigate('attendance')}
-          className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-emerald-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">2. Students Present</span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-xs font-bold text-gray-500">2. Students Present</span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
               <UserCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-white">
+            <div className="text-2xl font-extrabold text-gray-900">
               {commandData?.students_present.count ?? 0}
             </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+            <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
               <span>Turnout Rate</span>
-              <span className="font-bold text-emerald-400">{commandData?.students_present.percentage ?? 0}%</span>
+              <span className="font-bold text-emerald-600">{commandData?.students_present.percentage ?? 0}%</span>
             </div>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 mt-1.5 overflow-hidden">
+            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2 overflow-hidden">
               <div
                 className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
                 style={{ width: `${commandData?.students_present.percentage ?? 0}%` }}
@@ -256,23 +254,23 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Card 3: Students Absent */}
         <div
           onClick={() => onNavigate('attendance')}
-          className="bg-slate-900 border border-slate-800 hover:border-amber-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-amber-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">3. Students Absent</span>
-            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="text-xs font-bold text-gray-500">3. Students Absent</span>
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
               <UserX className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-white">
+            <div className="text-2xl font-extrabold text-gray-900">
               {commandData?.students_absent.count ?? 0}
             </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+            <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
               <span>Absent Rate</span>
-              <span className="font-bold text-amber-400">{commandData?.students_absent.percentage ?? 0}%</span>
+              <span className="font-bold text-amber-600">{commandData?.students_absent.percentage ?? 0}%</span>
             </div>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 mt-1.5 overflow-hidden">
+            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2 overflow-hidden">
               <div
                 className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
                 style={{ width: `${commandData?.students_absent.percentage ?? 0}%` }}
@@ -284,23 +282,23 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Card 4: Unknown People */}
         <div
           onClick={() => onNavigate('intelligence')}
-          className="bg-slate-900 border border-slate-800 hover:border-rose-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-red-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">4. Unknown People</span>
-            <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+            <span className="text-xs font-bold text-gray-500">4. Unknown People</span>
+            <div className="p-2 rounded-xl bg-red-50 text-red-600">
               <ShieldAlert className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-white">
+            <div className="text-2xl font-extrabold text-gray-900">
               {commandData?.unknown_people.count ?? 0}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-xs text-gray-500 mt-1 font-medium">
               Un-enrolled face events
             </p>
-            <div className="mt-2 text-[10px] text-slate-500 flex items-center space-x-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+            <div className="mt-2 text-[11px] text-gray-400 flex items-center space-x-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
               <span>Face filter active</span>
             </div>
           </div>
@@ -309,22 +307,22 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Card 5: Recognition Confidence */}
         <div
           onClick={() => onNavigate('validation')}
-          className="bg-slate-900 border border-slate-800 hover:border-blue-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-blue-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">5. Rec. Confidence</span>
-            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <span className="text-xs font-bold text-gray-500">5. Rec. Confidence</span>
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
               <Activity className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-white">
+            <div className="text-2xl font-extrabold text-gray-900">
               {commandData?.recognition_confidence.average_confidence ?? 94.2}%
             </div>
-            <p className="text-[11px] text-blue-300 mt-1 font-mono">
+            <p className="text-xs text-blue-600 mt-1 font-mono font-medium">
               {commandData?.recognition_confidence.dimension || '128D L2'}
             </p>
-            <div className="mt-2 text-[10px] text-slate-500 truncate">
+            <div className="mt-2 text-[11px] text-gray-400 truncate">
               Cosine/Euclidean exact
             </div>
           </div>
@@ -333,22 +331,22 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Card 6: Connected Cameras */}
         <div
           onClick={() => onNavigate('live-camera')}
-          className="bg-slate-900 border border-slate-800 hover:border-indigo-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-indigo-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">6. Cameras Online</span>
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <span className="text-xs font-bold text-gray-500">6. Cameras Online</span>
+            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
               <Camera className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-white">
+            <div className="text-2xl font-extrabold text-gray-900">
               {commandData?.connected_cameras.online_count ?? 1}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-xs text-gray-500 mt-1 font-medium">
               Webcam + WebRTC + RTSP
             </p>
-            <div className="mt-2 text-[10px] text-emerald-400 flex items-center space-x-1 font-bold">
+            <div className="mt-2 text-[11px] text-emerald-600 flex items-center space-x-1 font-semibold">
               <Check className="w-3 h-3" />
               <span>Multi-feed enabled</span>
             </div>
@@ -358,22 +356,22 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Card 7: Camera Health */}
         <div
           onClick={() => onNavigate('system')}
-          className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-emerald-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">7. Camera Health</span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-xs font-bold text-gray-500">7. Camera Health</span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
               <Wifi className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-xl font-black text-white flex items-center space-x-1.5">
+            <div className="text-xl font-extrabold text-gray-900 flex items-center space-x-1.5">
               <span>{commandData?.camera_health.avg_fps ?? 30} FPS</span>
             </div>
-            <p className="text-[11px] text-emerald-400 mt-1 font-mono">
+            <p className="text-xs text-emerald-600 mt-1 font-mono font-medium">
               {commandData?.camera_health.avg_latency_ms ?? 28}ms Latency
             </p>
-            <div className="mt-2 text-[10px] text-slate-500">
+            <div className="mt-2 text-[11px] text-gray-400">
               0 frame drops detected
             </div>
           </div>
@@ -382,22 +380,22 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Card 8: Google Sheet Health */}
         <div
           onClick={onOpenSheetsSync || (() => onNavigate('students'))}
-          className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-emerald-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">8. Google Sheets</span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-xs font-bold text-gray-500">8. Google Sheets</span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
               <FileSpreadsheet className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-xl font-black text-white flex items-center space-x-1.5">
+            <div className="text-xl font-extrabold text-gray-900 flex items-center space-x-1.5">
               <span>{commandData?.google_sheet_health.status || 'SYNCHRONIZED'}</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 truncate">
+            <p className="text-xs text-gray-500 mt-1 truncate font-medium">
               {commandData?.google_sheet_health.total_students ?? 0} Students in Roster
             </p>
-            <div className="mt-2 text-[10px] text-blue-400 flex items-center space-x-1 font-semibold">
+            <div className="mt-2 text-[11px] text-blue-600 flex items-center space-x-1 font-semibold">
               <span>Authoritative Source</span>
             </div>
           </div>
@@ -406,43 +404,43 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Card 9: AI Agent Status */}
         <div
           onClick={() => onNavigate('intelligence')}
-          className="bg-slate-900 border border-slate-800 hover:border-purple-500/40 rounded-xl p-4 transition cursor-pointer group"
+          className="apple-card p-5 bg-white border border-gray-200 hover:border-purple-400 transition cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">9. AI Agent</span>
-            <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <span className="text-xs font-bold text-gray-500">9. AI Agent</span>
+            <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
               <Cpu className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-xl font-black text-white flex items-center space-x-1.5">
+            <div className="text-xl font-extrabold text-gray-900 flex items-center space-x-1.5">
               <span>{commandData?.ai_agent_status.status || 'ONLINE'}</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 truncate">
+            <p className="text-xs text-gray-500 mt-1 truncate font-medium">
               Groq & DeepSeek Ready
             </p>
-            <div className="mt-2 text-[10px] text-purple-400 font-mono">
+            <div className="mt-2 text-[11px] text-purple-600 font-mono font-medium">
               Voice Agent active
             </div>
           </div>
         </div>
 
         {/* Card 10: Participating Departments */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="apple-card p-5 bg-white border border-gray-200">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">10. Departments</span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-xs font-bold text-gray-500">10. Departments</span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
               <Building2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-white">
+            <div className="text-2xl font-extrabold text-gray-900">
               {allDeptKeys.length || 10}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 truncate">
+            <p className="text-xs text-gray-500 mt-1 truncate font-medium">
               Google Sheet Synchronized
             </p>
-            <div className="mt-2 text-[10px] text-emerald-400 font-mono">
+            <div className="mt-2 text-[11px] text-emerald-600 font-mono font-medium">
               Multi-Dept Roster Ready
             </div>
           </div>
@@ -450,16 +448,16 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
       </div>
 
       {/* Real-Time Department Attendance Dashboard & Intelligence */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="apple-card p-6 bg-white space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-gray-100">
           <div>
             <div className="flex items-center space-x-2">
-              <BarChart3 className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+              <BarChart3 className="w-4 h-4 text-emerald-600" />
+              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                 Real-Time Department Attendance Intelligence
               </h2>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5">
               Authoritative Google Sheet student breakdown per department with live turnout percentages.
             </p>
           </div>
@@ -470,10 +468,10 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
               <button
                 key={opt.value}
                 onClick={() => setSelectedDeptFilter(opt.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition shrink-0 ${
                   selectedDeptFilter === opt.value
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-600 hover:text-gray-900 hover:bg-gray-200/70'
                 }`}
               >
                 {opt.label}
@@ -486,48 +484,48 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {commandData?.department_insights && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {commandData.department_insights.highest_attendance_department && (
-              <div className="bg-emerald-950/40 border border-emerald-800/40 rounded-xl p-3 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
                   <div>
-                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Highest Attendance</span>
-                    <p className="text-xs font-bold text-white truncate max-w-[150px]">
+                    <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Highest Attendance</span>
+                    <p className="text-xs font-bold text-gray-900 truncate max-w-[150px]">
                       {commandData.department_insights.highest_attendance_department.name}
                     </p>
                   </div>
                 </div>
-                <span className="text-sm font-mono font-black text-emerald-400">
+                <span className="text-sm font-mono font-bold text-emerald-700">
                   {commandData.department_insights.highest_attendance_department.percentage}%
                 </span>
               </div>
             )}
 
             {commandData.department_insights.lowest_attendance_department && (
-              <div className="bg-amber-950/40 border border-amber-800/40 rounded-xl p-3 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                   <div>
-                    <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Lowest Turnout</span>
-                    <p className="text-xs font-bold text-white truncate max-w-[150px]">
+                    <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Lowest Turnout</span>
+                    <p className="text-xs font-bold text-gray-900 truncate max-w-[150px]">
                       {commandData.department_insights.lowest_attendance_department.name}
                     </p>
                   </div>
                 </div>
-                <span className="text-sm font-mono font-black text-amber-400">
+                <span className="text-sm font-mono font-bold text-amber-700">
                   {commandData.department_insights.lowest_attendance_department.percentage}%
                 </span>
               </div>
             )}
 
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <ShieldAlert className="w-4 h-4 text-blue-400 shrink-0" />
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3.5 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <ShieldAlert className="w-4 h-4 text-blue-600 shrink-0" />
                 <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Compliance Threshold</span>
-                  <p className="text-xs font-bold text-white">75% Institutional Minimum</p>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Compliance Threshold</span>
+                  <p className="text-xs font-bold text-gray-900">75% Institutional Minimum</p>
                 </div>
               </div>
-              <span className="text-xs font-mono font-bold text-blue-400">Enforced</span>
+              <span className="text-xs font-mono font-bold text-blue-600">Enforced</span>
             </div>
           </div>
         )}
@@ -535,7 +533,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Department Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filteredDeptKeys.length === 0 ? (
-            <div className="col-span-full py-8 text-center text-slate-500">
+            <div className="col-span-full py-8 text-center text-gray-400">
               <Building2 className="w-6 h-6 mx-auto mb-2 opacity-40" />
               <span>No department found matching "{selectedDeptFilter}".</span>
             </div>
@@ -555,46 +553,46 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
               return (
                 <div
                   key={deptName}
-                  className="bg-slate-950/70 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 space-y-2.5 transition"
+                  className="bg-gray-50/70 border border-gray-200 hover:border-gray-300 rounded-2xl p-4 space-y-2.5 transition"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono font-bold text-emerald-300">
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-xs font-mono font-bold text-blue-700">
                         {shortCode}
                       </span>
-                      <span className="text-xs font-semibold text-white truncate max-w-[130px]">
+                      <span className="text-xs font-semibold text-gray-800 truncate max-w-[130px]">
                         {deptName}
                       </span>
                     </div>
                     <span
-                      className={`text-xs font-mono font-black ${
-                        isHigh ? 'text-emerald-400' : isLow ? 'text-rose-400' : 'text-amber-400'
+                      className={`text-xs font-mono font-bold ${
+                        isHigh ? 'text-emerald-600' : isLow ? 'text-red-600' : 'text-amber-600'
                       }`}
                     >
                       {stat.attendance_percentage}%
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-1 text-[11px] pt-1 border-t border-slate-900">
+                  <div className="grid grid-cols-3 gap-1 text-[11px] pt-1.5 border-t border-gray-200/80">
                     <div>
-                      <span className="text-slate-500 block text-[10px]">Total</span>
-                      <span className="font-mono text-slate-200 font-bold">{stat.total}</span>
+                      <span className="text-gray-400 block text-[10px]">Total</span>
+                      <span className="font-mono text-gray-700 font-bold">{stat.total}</span>
                     </div>
                     <div>
-                      <span className="text-emerald-500/80 block text-[10px]">Present</span>
-                      <span className="font-mono text-emerald-400 font-bold">{stat.present}</span>
+                      <span className="text-emerald-600 block text-[10px]">Present</span>
+                      <span className="font-mono text-emerald-600 font-bold">{stat.present}</span>
                     </div>
                     <div>
-                      <span className="text-rose-500/80 block text-[10px]">Absent</span>
-                      <span className="font-mono text-rose-400 font-bold">{stat.absent}</span>
+                      <span className="text-red-600 block text-[10px]">Absent</span>
+                      <span className="font-mono text-red-600 font-bold">{stat.absent}</span>
                     </div>
                   </div>
 
                   {/* Progress bar */}
-                  <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                  <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
-                        isHigh ? 'bg-emerald-500' : isLow ? 'bg-rose-500' : 'bg-amber-500'
+                        isHigh ? 'bg-emerald-500' : isLow ? 'bg-red-500' : 'bg-amber-500'
                       }`}
                       style={{ width: `${Math.min(100, stat.attendance_percentage)}%` }}
                     />
@@ -609,63 +607,63 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
       {/* Main Command Center Layout: Live Activity Stream + Navigation Hub */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Real-time Live Activity Stream */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+        <div className="lg:col-span-2 apple-card p-6 bg-white space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
             <div className="flex items-center space-x-2">
-              <Activity className="w-4 h-4 text-blue-400" />
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+              <Activity className="w-4 h-4 text-blue-600" />
+              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                 Live Institutional Activity Ledger
               </h2>
             </div>
-            <span className="text-[11px] font-mono text-slate-400">
+            <span className="text-[11px] font-mono text-gray-500">
               Real telemetry stream
             </span>
           </div>
 
           {commandData?.live_activity && commandData.live_activity.length > 0 ? (
-            <div className="divide-y divide-slate-800 max-h-[380px] overflow-y-auto pr-1">
+            <div className="divide-y divide-gray-100 max-h-[380px] overflow-y-auto pr-1">
               {commandData.live_activity.map((event: any) => (
                 <div key={event.id} className="py-3 flex items-start justify-between space-x-3 text-xs">
                   <div className="flex items-start space-x-3">
                     <div
-                      className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${
+                      className={`mt-0.5 p-2 rounded-xl shrink-0 ${
                         event.severity === 'SUCCESS'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          ? 'bg-emerald-50 text-emerald-600'
                           : event.severity === 'ALERT'
-                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          ? 'bg-red-50 text-red-600'
                           : event.severity === 'WARNING'
-                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                          ? 'bg-amber-50 text-amber-600'
+                          : 'bg-blue-50 text-blue-600'
                       }`}
                     >
                       {event.type === 'ATTENDANCE_RECORDED' ? (
-                        <UserCheck className="w-3.5 h-3.5" />
+                        <UserCheck className="w-4 h-4" />
                       ) : event.type === 'GOOGLE_SHEET_SYNC' ? (
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                        <FileSpreadsheet className="w-4 h-4" />
                       ) : event.type === 'CAMERA_CONNECTED' ? (
-                        <Camera className="w-3.5 h-3.5" />
+                        <Camera className="w-4 h-4" />
                       ) : event.type === 'UNKNOWN_PERSON' ? (
-                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <ShieldAlert className="w-4 h-4" />
                       ) : (
-                        <Activity className="w-3.5 h-3.5" />
+                        <Activity className="w-4 h-4" />
                       )}
                     </div>
                     <div>
-                      <p className="font-bold text-white">{event.title}</p>
-                      <p className="text-slate-400 text-[11px] mt-0.5">{event.description}</p>
+                      <p className="font-bold text-gray-900">{event.title}</p>
+                      <p className="text-gray-500 text-xs mt-0.5">{event.description}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-mono shrink-0 whitespace-nowrap">
+                  <span className="text-[11px] text-gray-400 font-mono shrink-0 whitespace-nowrap">
                     {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-8 border border-dashed border-slate-800 rounded-xl text-center space-y-2">
-              <Activity className="w-8 h-8 opacity-30 text-slate-400 mx-auto" />
-              <p className="text-xs font-semibold text-slate-400">No activity events recorded yet today</p>
-              <p className="text-[11px] text-slate-600 max-w-sm mx-auto">
+            <div className="p-8 border border-dashed border-gray-200 rounded-2xl text-center space-y-2">
+              <Activity className="w-8 h-8 opacity-30 text-gray-400 mx-auto" />
+              <p className="text-xs font-semibold text-gray-600">No activity events recorded yet today</p>
+              <p className="text-xs text-gray-400 max-w-sm mx-auto">
                 Start an attendance session and launch the camera to begin live multi-face recognition streaming.
               </p>
             </div>
@@ -675,94 +673,94 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         {/* Quick Operations & System Specs */}
         <div className="space-y-4">
           {/* Quick Nav Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="apple-card p-6 bg-white space-y-3">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
               Quick Operations
             </h3>
             
             <div className="space-y-2">
               <button
                 onClick={() => onNavigate('live-camera')}
-                className="w-full p-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left flex items-center justify-between text-xs transition"
+                className="w-full p-3 bg-gray-50 hover:bg-gray-100/80 border border-gray-200 rounded-xl text-left flex items-center justify-between text-xs transition"
               >
                 <div className="flex items-center space-x-2.5">
-                  <Camera className="w-4 h-4 text-blue-400" />
-                  <span className="font-semibold text-white">Live Attendance Stream</span>
+                  <Camera className="w-4 h-4 text-blue-600" />
+                  <span className="font-semibold text-gray-800">Live Attendance Stream</span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
               </button>
 
               <button
                 onClick={() => onNavigate('devices')}
-                className="w-full p-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left flex items-center justify-between text-xs transition"
+                className="w-full p-3 bg-gray-50 hover:bg-gray-100/80 border border-gray-200 rounded-xl text-left flex items-center justify-between text-xs transition"
               >
                 <div className="flex items-center space-x-2.5">
-                  <Radio className="w-4 h-4 text-cyan-400" />
-                  <span className="font-semibold text-white">Campus IoT & Sensor Hub</span>
+                  <Radio className="w-4 h-4 text-indigo-600" />
+                  <span className="font-semibold text-gray-800">Campus Device Center</span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
               </button>
 
               <button
                 onClick={() => onNavigate('students')}
-                className="w-full p-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left flex items-center justify-between text-xs transition"
+                className="w-full p-3 bg-gray-50 hover:bg-gray-100/80 border border-gray-200 rounded-xl text-left flex items-center justify-between text-xs transition"
               >
                 <div className="flex items-center space-x-2.5">
-                  <Users className="w-4 h-4 text-emerald-400" />
-                  <span className="font-semibold text-white">Authoritative Student Registry</span>
+                  <Users className="w-4 h-4 text-emerald-600" />
+                  <span className="font-semibold text-gray-800">Authoritative Student Registry</span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
               </button>
 
               <button
                 onClick={() => onNavigate('attendance')}
-                className="w-full p-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left flex items-center justify-between text-xs transition"
+                className="w-full p-3 bg-gray-50 hover:bg-gray-100/80 border border-gray-200 rounded-xl text-left flex items-center justify-between text-xs transition"
               >
                 <div className="flex items-center space-x-2.5">
-                  <FileSpreadsheet className="w-4 h-4 text-indigo-400" />
-                  <span className="font-semibold text-white">Attendance Records & Export</span>
+                  <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+                  <span className="font-semibold text-gray-800">Attendance Records & Export</span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
               </button>
 
               <button
                 onClick={() => onNavigate('validation')}
-                className="w-full p-2.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-left flex items-center justify-between text-xs transition"
+                className="w-full p-3 bg-gray-50 hover:bg-gray-100/80 border border-gray-200 rounded-xl text-left flex items-center justify-between text-xs transition"
               >
                 <div className="flex items-center space-x-2.5">
-                  <Activity className="w-4 h-4 text-purple-400" />
-                  <span className="font-semibold text-white">128D Accuracy Validation</span>
+                  <Activity className="w-4 h-4 text-amber-600" />
+                  <span className="font-semibold text-gray-800">128D Accuracy Validation</span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
               </button>
             </div>
           </div>
 
           {/* Biometric Verification Specs */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="apple-card p-6 bg-white space-y-3">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
               Biometric Architecture Specs
             </h3>
-            <div className="space-y-2 text-[11px] font-mono">
-              <div className="flex justify-between py-1 border-b border-slate-800 text-slate-400">
+            <div className="space-y-2 text-xs font-mono">
+              <div className="flex justify-between py-1.5 border-b border-gray-100 text-gray-500">
                 <span>Face Detector</span>
-                <span className="text-white font-bold">SSD MobileNet V1</span>
+                <span className="text-gray-900 font-bold">SSD MobileNet V1</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800 text-slate-400">
+              <div className="flex justify-between py-1.5 border-b border-gray-100 text-gray-500">
                 <span>Embedding Model</span>
-                <span className="text-white font-bold">FaceRecognitionNet</span>
+                <span className="text-gray-900 font-bold">FaceRecognitionNet</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800 text-slate-400">
+              <div className="flex justify-between py-1.5 border-b border-gray-100 text-gray-500">
                 <span>Vector Dimension</span>
-                <span className="text-emerald-400 font-bold">128D Float32</span>
+                <span className="text-emerald-600 font-bold">128D Float32</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800 text-slate-400">
+              <div className="flex justify-between py-1.5 border-b border-gray-100 text-gray-500">
                 <span>Distance Metric</span>
-                <span className="text-blue-400 font-bold">Euclidean & Cosine</span>
+                <span className="text-blue-600 font-bold">Euclidean & Cosine</span>
               </div>
-              <div className="flex justify-between py-1 text-slate-400">
+              <div className="flex justify-between py-1.5 text-gray-500">
                 <span>Temporal Window</span>
-                <span className="text-amber-400 font-bold">3 Consecutive Frames</span>
+                <span className="text-amber-600 font-bold">3 Consecutive Frames</span>
               </div>
             </div>
           </div>
@@ -771,4 +769,3 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
     </div>
   );
 };
-

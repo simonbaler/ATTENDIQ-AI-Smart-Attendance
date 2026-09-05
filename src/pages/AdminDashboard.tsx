@@ -47,7 +47,7 @@ export const AdminDashboard: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#F7F8FA] text-gray-900 flex flex-col selection:bg-blue-600 selection:text-white">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}

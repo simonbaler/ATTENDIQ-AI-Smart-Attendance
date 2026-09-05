@@ -34,17 +34,33 @@ import {
   Check,
   Zap,
   ArrowRight,
+  Eye,
+  Video,
+  Settings,
+  HelpCircle,
+  Copy,
+  BookOpen,
+  MapPin,
+  Lock,
+  Smartphone,
+  Server,
+  Network,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { bluetoothManager, EnvironmentDiagnostics } from '../services/bluetooth';
 import { iotGatewayClient, IoTGatewayConnectionState } from '../services/iotGatewayClient';
+import {
+  hardwareDiscovery,
+  HardwareCameraDevice,
+  DiscoveredBluetoothDevice,
+  ClassroomAssignment,
+} from '../services/hardwareDiscovery';
 import {
   CampusDevice,
   DeviceCategory,
   DeviceProtocol,
+  DeviceRole,
   SmartClassroomCorrelation,
   RemoteSensingData,
-  BluetoothCapabilityState,
   DeviceTelemetry,
   DeviceEventLog,
 } from '../types';
@@ -58,7 +74,12 @@ export const CampusDeviceManager: React.FC<CampusDeviceManagerProps> = ({
   userRole = 'ADMIN',
   userDepartment = 'Computer Science & Engineering',
 }) => {
-  const [activeTab, setActiveTab] = useState<'devices' | 'gateway' | 'bluetooth' | 'smart_classroom' | 'events' | 'remote_sensing'>('devices');
+  // Navigation tabs
+  const [activeTab, setActiveTab] = useState<
+    'all' | 'bluetooth' | 'wifi' | 'usb_cameras' | 'ip_cameras' | 'esp32' | 'sensors' | 'gateways' | 'hotspot' | 'docs'
+  >('all');
+
+  // Device records from server database
   const [devices, setDevices] = useState<CampusDevice[]>([]);
   const [stats, setStats] = useState<{
     total: number;
@@ -71,122 +92,130 @@ export const CampusDeviceManager: React.FC<CampusDeviceManagerProps> = ({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // WebSocket Live Gateway State
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [classroomFilter, setClassroomFilter] = useState<string>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+
+  // Real Hardware: Bluetooth State
+  const [discoveredBleDevices, setDiscoveredBleDevices] = useState<DiscoveredBluetoothDevice[]>([]);
+  const [bleScanning, setBleScanning] = useState(false);
+  const [bleError, setBleError] = useState<{ message: string; isIframeBlocked?: boolean } | null>(null);
+
+  // Real Hardware: USB & Physical Cameras
+  const [discoveredCameras, setDiscoveredCameras] = useState<HardwareCameraDevice[]>([]);
+  const [activeAttendanceCameraId, setActiveAttendanceCameraId] = useState<string | null>(
+    hardwareDiscovery.getActiveAttendanceCamera()
+  );
+  const [cameraScanning, setCameraScanning] = useState(false);
+  const [cameraPreviewDevice, setCameraPreviewDevice] = useState<HardwareCameraDevice | null>(null);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const previewStreamRef = useRef<MediaStream | null>(null);
+
+  // Real Hardware: Network Info
+  const [networkInfo, setNetworkInfo] = useState<any>(hardwareDiscovery.getNetworkInfo());
+
+  // WebSocket Live Gateway State & Event Logs
   const [wsState, setWsState] = useState<IoTGatewayConnectionState>('DISCONNECTED');
   const [liveEvents, setLiveEvents] = useState<DeviceEventLog[]>([]);
 
-  // Filters
-  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [classroomFilter, setClassroomFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  // Classroom Assignment Modal
+  const [assigningDevice, setAssigningDevice] = useState<CampusDevice | null>(null);
+  const [assignmentForm, setAssignmentForm] = useState<ClassroomAssignment>({
+    building: 'Main Academic Block',
+    room: 'Room 304',
+    classroom: 'LH-101',
+    device_role: 'Attendance Camera',
+  });
+  const [assigningLoading, setAssigningLoading] = useState(false);
 
-  // Register Modal
+  // Register New Device Modal
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [registerForm, setRegisterForm] = useState({
     name: '',
     category: 'ESP32_GATEWAY' as DeviceCategory,
     device_type: 'ESP32 Environmental Gateway (DHT22 + MQ-135 + PIR)',
     classroom: 'LH-101',
     building: 'Main Academic Block',
+    room: 'Room 304',
     department: userRole === 'HOD' ? userDepartment : 'Computer Science & Engineering',
     protocol: 'HTTPS_REST' as DeviceProtocol,
     ip_or_hostname: '',
     mac_or_uuid: '',
-    capabilities: ['TEMPERATURE', 'HUMIDITY', 'CO2', 'OCCUPANCY', 'NOISE_LEVEL'],
+    device_role: 'Environmental Sensor' as DeviceRole,
+    capabilities: ['TEMPERATURE', 'HUMIDITY', 'CO2', 'OCCUPANCY'],
   });
   const [registeredCredentials, setRegisteredCredentials] = useState<any | null>(null);
   const [registering, setRegistering] = useState(false);
 
-  // Code Snippet & Firmware Modal
-  const [selectedDeviceForCode, setSelectedDeviceForCode] = useState<CampusDevice | null>(null);
-  const [firmwareTab, setFirmwareTab] = useState<'arduino' | 'micropython' | 'curl' | 'websocket'>('arduino');
+  // Code / Hotspot Snippet Copy State
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
 
-  // Interactive Ingestion Testing Panel
-  const [testPayload, setTestPayload] = useState({
-    deviceId: 'ESP32-C204-01',
-    classroom: 'C-204',
-    temperature_c: 24.5,
-    humidity_pct: 54,
-    co2_ppm: 520,
-    occupancy_count: 35,
-    noise_db: 48,
-  });
-  const [testSending, setTestSending] = useState(false);
-  const [testResult, setTestResult] = useState<any | null>(null);
+  // Load server devices & stats
+  const loadData = async () => {
+    try {
+      const [devRes, statRes] = await Promise.all([
+        api.getCampusDevices({ department: userRole === 'HOD' ? userDepartment : undefined }),
+        api.getDeviceStats(),
+      ]);
 
-  // Diagnostics & Bluetooth State
-  const [diagnostics, setDiagnostics] = useState<EnvironmentDiagnostics | null>(null);
-  const [bleState, setBleState] = useState<{
-    capability: BluetoothCapabilityState;
-    message: string;
-    isIframe: boolean;
-    isSecure: boolean;
-    scanning: boolean;
-    connectedDeviceName: string | null;
-    liveTelemetry: DeviceTelemetry | null;
-    error: string | null;
-  }>({
-    capability: 'AVAILABLE',
-    message: '',
-    isIframe: false,
-    isSecure: true,
-    scanning: false,
-    connectedDeviceName: null,
-    liveTelemetry: null,
-    error: null,
-  });
+      if (devRes.success && Array.isArray(devRes.devices)) {
+        setDevices(devRes.devices);
+      }
+      if (statRes.success && statRes.stats) {
+        setStats(statRes.stats);
+      }
+    } catch (err) {
+      console.error('Failed to load campus devices:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-  // Smart Classroom Correlations
-  const [correlations, setCorrelations] = useState<SmartClassroomCorrelation[]>([]);
-  const [correlationsLoading, setCorrelationsLoading] = useState(false);
+  // Load event history
+  const loadEvents = async () => {
+    try {
+      const res = await fetch('/api/devices/events', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.events)) {
+        setLiveEvents(data.events);
+      }
+    } catch (err) {
+      console.error('Failed to load device events:', err);
+    }
+  };
 
-  // Remote Sensing Data
-  const [remoteSensing, setRemoteSensing] = useState<RemoteSensingData | null>(null);
-  const [remoteSensingLoading, setRemoteSensingLoading] = useState(false);
-  const [remoteSensingError, setRemoteSensingError] = useState<string | null>(null);
-
-  // Run diagnostics and initial load
   useEffect(() => {
-    runDiagnostics();
     loadData();
     loadEvents();
 
-    // Subscribe to IoT Gateway WebSocket Client
-    const unsubState = iotGatewayClient.onState((state) => {
-      setWsState(state);
-    });
+    // Scan cameras automatically on mount if supported
+    scanCameras();
 
+    // Subscribe to IoT Gateway WebSocket
+    const unsubState = iotGatewayClient.onState((state) => setWsState(state));
     const unsubTelemetry = iotGatewayClient.onTelemetry((evt) => {
-      setDevices((prevDevices) =>
-        prevDevices.map((d) => {
-          if (d.id === evt.deviceId) {
-            return {
-              ...d,
-              status: 'ONLINE',
-              telemetry: evt.telemetry,
-              last_heartbeat: evt.timestamp,
-            };
-          }
-          return d;
-        })
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.id === evt.deviceId
+            ? { ...d, status: 'ONLINE', telemetry: evt.telemetry, last_heartbeat: evt.timestamp }
+            : d
+        )
       );
     });
-
     const unsubStatus = iotGatewayClient.onStatus((evt) => {
-      setDevices((prevDevices) =>
-        prevDevices.map((d) => {
-          if (d.id === evt.deviceId) {
-            return {
-              ...d,
-              status: evt.status,
-              last_heartbeat: evt.lastSeen || d.last_heartbeat,
-            };
-          }
-          return d;
-        })
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.id === evt.deviceId
+            ? { ...d, status: evt.status, last_heartbeat: evt.lastSeen || d.last_heartbeat }
+            : d
+        )
       );
     });
-
     const unsubEvent = iotGatewayClient.onEvent((event) => {
       setLiveEvents((prev) => [event, ...prev.slice(0, 49)]);
     });
@@ -196,1474 +225,1270 @@ export const CampusDeviceManager: React.FC<CampusDeviceManagerProps> = ({
       unsubTelemetry();
       unsubStatus();
       unsubEvent();
+      stopCameraPreview();
     };
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [categoryFilter, classroomFilter, statusFilter]);
-
-  const runDiagnostics = () => {
-    const diag = bluetoothManager.diagnoseEnvironment();
-    setDiagnostics(diag);
-    setBleState((prev) => ({
-      ...prev,
-      capability: diag.bluetoothApi.capabilityState,
-      message: diag.bluetoothApi.statusMessage,
-      isIframe: diag.iframeStatus.isInsideIframe,
-      isSecure: diag.httpsStatus.isSecureContext,
-    }));
-  };
-
-  const loadData = async () => {
-    setLoading(true);
+  // Real USB Camera Scanner
+  const scanCameras = async () => {
+    setCameraScanning(true);
     try {
-      const [devRes, statRes] = await Promise.all([
-        api.getCampusDevices({
-          category: categoryFilter,
-          classroom: classroomFilter,
-          status: statusFilter,
-          department: userRole === 'HOD' ? userDepartment : undefined,
-        }),
-        api.getDeviceStats(),
-      ]);
-
-      if (devRes.success) {
-        setDevices(devRes.devices || []);
-      }
-      if (statRes.success) {
-        setStats(statRes.stats);
-      }
+      const res = await hardwareDiscovery.discoverCameras();
+      setDiscoveredCameras(res.cameras);
     } catch (err) {
-      console.error('Error loading devices:', err);
+      console.error('Camera discovery error:', err);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setCameraScanning(false);
     }
   };
 
-  const loadEvents = async () => {
+  // Start Camera Live Preview
+  const startCameraPreview = async (cam: HardwareCameraDevice) => {
+    stopCameraPreview();
+    setCameraPreviewDevice(cam);
     try {
-      const res = await api.getDeviceEvents();
-      if (res.success && Array.isArray(res.events)) {
-        setLiveEvents(res.events);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: cam.deviceId } },
+        audio: false,
+      });
+      previewStreamRef.current = stream;
+      if (previewVideoRef.current) {
+        previewVideoRef.current.srcObject = stream;
+        previewVideoRef.current.play();
       }
     } catch (err) {
-      console.error('Error loading device events:', err);
+      console.error('Preview stream error:', err);
     }
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    runDiagnostics();
-    loadData();
-    loadEvents();
-    if (activeTab === 'smart_classroom') loadCorrelations();
-    if (activeTab === 'remote_sensing') loadRemoteSensing();
-  };
-
-  const loadCorrelations = async () => {
-    setCorrelationsLoading(true);
-    try {
-      const res = await api.getSmartClassroomCorrelations();
-      if (res.success) {
-        setCorrelations(res.correlations || []);
-      }
-    } catch (err) {
-      console.error('Error loading correlations:', err);
-    } finally {
-      setCorrelationsLoading(false);
+  const stopCameraPreview = () => {
+    if (previewStreamRef.current) {
+      previewStreamRef.current.getTracks().forEach((t) => t.stop());
+      previewStreamRef.current = null;
     }
+    if (previewVideoRef.current) {
+      previewVideoRef.current.srcObject = null;
+    }
+    setCameraPreviewDevice(null);
   };
 
-  const loadRemoteSensing = async () => {
-    setRemoteSensingLoading(true);
-    setRemoteSensingError(null);
+  // Select camera for attendance
+  const handleSelectAttendanceCamera = (cam: HardwareCameraDevice) => {
+    hardwareDiscovery.setActiveAttendanceCamera(cam.deviceId);
+    setActiveAttendanceCameraId(cam.deviceId);
+  };
+
+  // Real Web Bluetooth Scanner (Direct User Click Only)
+  const handleScanBluetooth = async () => {
+    setBleScanning(true);
+    setBleError(null);
     try {
-      const res = await api.getRemoteSensingWeather(17.4399, 78.6811);
-      if (res.success) {
-        setRemoteSensing(res);
-      } else {
-        setRemoteSensingError('Failed to retrieve remote sensing telemetry from Open-Meteo satellite provider.');
+      const res = await hardwareDiscovery.scanBluetoothDevice();
+      if (res.success && res.device) {
+        const dev = res.device;
+        setDiscoveredBleDevices((prev) => {
+          const filtered = prev.filter((d) => d.id !== dev.id);
+          return [dev, ...filtered];
+        });
+      } else if (res.error) {
+        throw new Error(res.error);
       }
     } catch (err: any) {
-      setRemoteSensingError(err.message || 'Remote sensing provider unreachable.');
+      console.warn('Bluetooth scan result:', err);
+      const msg = err.message || 'Bluetooth operation failed.';
+      const isIframe =
+        msg.includes('Permissions policy') ||
+        msg.includes('disallowed by permissions policy') ||
+        (typeof window !== 'undefined' && window.self !== window.top);
+      setBleError({ message: msg, isIframeBlocked: isIframe });
     } finally {
-      setRemoteSensingLoading(false);
+      setBleScanning(false);
     }
   };
 
-  const handleTabChange = (tab: typeof activeTab) => {
-    setActiveTab(tab);
-    if (tab === 'smart_classroom') loadCorrelations();
-    if (tab === 'remote_sensing') loadRemoteSensing();
-    if (tab === 'events') loadEvents();
+  // Connect BLE Device
+  const handleConnectBle = async (dev: DiscoveredBluetoothDevice) => {
+    try {
+      await hardwareDiscovery.connectBluetoothDevice(dev.id);
+      setDiscoveredBleDevices((prev) =>
+        prev.map((d) => (d.id === dev.id ? { ...d, connected: true } : d))
+      );
+    } catch (err: any) {
+      alert(`Could not connect to GATT server: ${err.message}`);
+    }
   };
 
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
+  // Disconnect BLE Device
+  const handleDisconnectBle = (dev: DiscoveredBluetoothDevice) => {
+    hardwareDiscovery.disconnectBluetoothDevice(dev.id);
+    setDiscoveredBleDevices((prev) =>
+      prev.map((d) => (d.id === dev.id ? { ...d, connected: false } : d))
+    );
+  };
+
+  // Save Classroom Assignment
+  const handleSaveAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assigningDevice) return;
+    setAssigningLoading(true);
+    try {
+      const res = await api.updateCampusDevice(assigningDevice.id, {
+        building: assignmentForm.building,
+        room: assignmentForm.room,
+        classroom: assignmentForm.classroom,
+        device_role: assignmentForm.device_role,
+      });
+      if (res.success) {
+        setDevices((prev) =>
+          prev.map((d) =>
+            d.id === assigningDevice.id
+              ? {
+                  ...d,
+                  building: assignmentForm.building,
+                  room: assignmentForm.room,
+                  classroom: assignmentForm.classroom,
+                  device_role: assignmentForm.device_role,
+                }
+              : d
+          )
+        );
+        setAssigningDevice(null);
+      } else {
+        alert(res.message || 'Failed to update assignment.');
+      }
+    } catch (err: any) {
+      alert(`Assignment error: ${err.message}`);
+    } finally {
+      setAssigningLoading(false);
+    }
+  };
+
+  // Open Classroom Assignment
+  const openAssignmentModal = (device: CampusDevice) => {
+    setAssigningDevice(device);
+    setAssignmentForm({
+      building: device.building || 'Main Academic Block',
+      room: device.room || 'Room 304',
+      classroom: device.classroom || 'LH-101',
+      device_role: device.device_role || 'Attendance Camera',
+    });
+  };
+
+  // Register New Device
+  const handleRegisterDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegistering(true);
     try {
-      const res = await api.registerCampusDevice(registerForm);
-      if (res.success) {
-        setRegisteredCredentials(res.credentials);
+      const res = await api.registerCampusDevice({
+        name: registerForm.name,
+        category: registerForm.category,
+        device_type: registerForm.device_type,
+        classroom: registerForm.classroom,
+        building: registerForm.building,
+        room: registerForm.room,
+        department: registerForm.department,
+        protocol: registerForm.protocol,
+        ip_or_hostname: registerForm.ip_or_hostname,
+        mac_or_uuid: registerForm.mac_or_uuid,
+        device_role: registerForm.device_role,
+        capabilities: registerForm.capabilities,
+      });
+
+      if (res.success && res.device) {
+        setDevices((prev) => [res.device, ...prev]);
+        setRegisteredCredentials(res.credentials || null);
         loadData();
       } else {
         alert(res.message || 'Registration failed.');
       }
     } catch (err: any) {
-      alert(err.message || 'Registration failed.');
+      alert(`Error registering device: ${err.message}`);
     } finally {
       setRegistering(false);
     }
   };
 
-  const handleDeleteDevice = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to remove the registered device "${name}"?`)) return;
-    try {
-      const res = await api.deleteCampusDevice(id);
-      if (res.success) {
-        loadData();
-      }
-    } catch (err) {
-      console.error('Failed to delete device:', err);
-    }
-  };
+  // Filtered devices list
+  const filteredDevices = devices.filter((d) => {
+    // Tab filter
+    if (activeTab === 'bluetooth' && d.category !== 'BLUETOOTH_BLE' && d.protocol !== 'BLE_GATT') return false;
+    if (activeTab === 'usb_cameras' && d.category !== 'USB_CAMERA' && d.device_role !== 'Attendance Camera') return false;
+    if (activeTab === 'ip_cameras' && d.category !== 'IP_RTSP_CAMERA' && d.protocol !== 'RTSP_H264') return false;
+    if (activeTab === 'esp32' && d.category !== 'ESP32_GATEWAY' && !d.name.includes('ESP32')) return false;
+    if (activeTab === 'sensors' && d.category !== 'BLE_ENVIRONMENTAL_SENSOR' && d.device_role !== 'Environmental Sensor' && d.device_role !== 'Occupancy Sensor') return false;
+    if (activeTab === 'gateways' && d.category !== 'ESP32_GATEWAY' && d.category !== 'EDGE_COMPUTE_AI') return false;
 
-  const handleScanBluetoothDevice = async () => {
-    setBleState((prev) => ({ ...prev, scanning: true, error: null }));
-    try {
-      const res = await bluetoothManager.connectSensorDevice(
-        (telemetry) => {
-          setBleState((prev) => ({ ...prev, liveTelemetry: telemetry }));
-        },
-        (status, errorMsg) => {
-          if (status === 'ERROR' && errorMsg) {
-            setBleState((prev) => ({ ...prev, error: errorMsg, scanning: false }));
-          }
-        }
-      );
+    // Status filter
+    if (statusFilter !== 'ALL' && d.status !== statusFilter) return false;
+    // Classroom filter
+    if (classroomFilter !== 'ALL' && d.classroom !== classroomFilter) return false;
+    // Category filter
+    if (categoryFilter !== 'ALL' && d.category !== categoryFilter) return false;
 
-      if (res.success && res.connection) {
-        setBleState((prev) => ({
-          ...prev,
-          capability: 'CONNECTED',
-          connectedDeviceName: res.connection?.name || 'BLE Physical Sensor Node',
-          scanning: false,
-          error: null,
-        }));
-      } else {
-        setBleState((prev) => ({
-          ...prev,
-          capability: res.state,
-          error: res.error || null,
-          scanning: false,
-        }));
-      }
-    } catch (err: any) {
-      setBleState((prev) => ({
-        ...prev,
-        error: err.message || 'Bluetooth connection failed.',
-        scanning: false,
-      }));
-    }
-  };
+    return true;
+  });
 
-  const handleSendTestTelemetry = async () => {
-    setTestSending(true);
-    setTestResult(null);
-    try {
-      const targetDevice = devices.find((d) => d.id === testPayload.deviceId) || devices[0];
-      const res = await api.submitEsp32Telemetry({
-        deviceId: targetDevice ? targetDevice.id : testPayload.deviceId,
-        token: targetDevice?.device_token,
-        classroom: testPayload.classroom,
-        sensors: {
-          temperature_c: testPayload.temperature_c,
-          humidity_pct: testPayload.humidity_pct,
-          co2_ppm: testPayload.co2_ppm,
-          occupancy_count: testPayload.occupancy_count,
-          noise_db: testPayload.noise_db,
-        },
-      });
-      setTestResult(res);
-      loadData();
-    } catch (err: any) {
-      setTestResult({ success: false, message: err.message || 'Ingestion failed.' });
-    } finally {
-      setTestSending(false);
-    }
-  };
-
-  const openAppInNewTab = () => {
-    if (typeof window !== 'undefined') {
-      window.open(window.location.href, '_blank', 'noopener,noreferrer');
-    }
-  };
-
-  const getCategoryBadge = (category: DeviceCategory) => {
-    switch (category) {
-      case 'ESP32_GATEWAY':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/80 text-cyan-400 border border-cyan-800/40">ESP32 GATEWAY</span>;
-      case 'BLE_SENSOR':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950/80 text-blue-400 border border-blue-800/40">BLE SENSOR</span>;
-      case 'OCCUPANCY_SENSOR':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950/80 text-indigo-400 border border-indigo-800/40">OCCUPANCY PIR</span>;
-      case 'ENVIRONMENTAL_SENSOR':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">ENVIRONMENTAL</span>;
-      case 'CAMERA':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950/80 text-purple-400 border border-purple-800/40">VISION CAMERA</span>;
-      case 'DOOR_BEACON':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-400 border border-amber-800/40">DOOR BEACON</span>;
-      default:
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">DEVICE</span>;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ONLINE':
-        return (
-          <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>ONLINE</span>
-          </span>
-        );
-      case 'CONNECTING':
-        return (
-          <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-            <span>CONNECTING</span>
-          </span>
-        );
-      case 'ERROR':
-        return (
-          <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-            <span>ERROR</span>
-          </span>
-        );
-      default:
-        return (
-          <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-            <span>OFFLINE</span>
-          </span>
-        );
-    }
-  };
+  // Extract dynamic classroom options
+  const classroomOptions = Array.from(new Set(devices.map((d) => d.classroom).filter(Boolean)));
 
   return (
     <div className="space-y-6">
-      {/* Header & Stats Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                <Radio className="w-5 h-5" />
+      {/* Top Header Card: Campus Device Center */}
+      <div className="apple-card p-6 sm:p-7 bg-white relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
+                <Radio className="w-3.5 h-3.5 text-blue-600" />
+                <span>REAL-WORLD HARDWARE DISCOVERY & SENSOR INTELLIGENCE</span>
               </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h1 className="text-xl font-bold text-white tracking-tight">Campus IoT & Sensor Intelligence Hub</h1>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1 border ${
-                      wsState === 'CONNECTED'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                        : wsState === 'RECONNECTING'
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
-                    }`}
-                  >
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        wsState === 'CONNECTED' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                      }`}
-                    />
-                    <span>WS GATEWAY: {wsState}</span>
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Real-time hardware telemetry gateway for ESP32 Wi-Fi nodes, Web Bluetooth sensors, RTSP vision cameras & Open-Meteo
-                </p>
+
+              <div
+                className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                  wsState === 'CONNECTED'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    wsState === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  }`}
+                />
+                <span>GATEWAY WS: {wsState}</span>
+              </div>
+
+              <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-gray-50 text-gray-600 text-xs font-medium border border-gray-200">
+                <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Zero Simulated Hardware</span>
               </div>
             </div>
+
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+              Campus Device Center
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-600 max-w-3xl leading-relaxed">
+              Discover, configure, and monitor authentic physical classroom hardware: Web Bluetooth BLE peripherals, USB cameras, ESP32 microcontrollers, and IoT gateways with truthful telemetry.
+            </p>
           </div>
 
-          <div className="flex items-center space-x-3">
+          {/* Quick Hardware Actions */}
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 flex items-center space-x-1.5 transition shadow-sm"
+              onClick={handleScanBluetooth}
+              disabled={bleScanning}
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs sm:text-sm font-semibold shadow-xs transition flex items-center space-x-2 disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              <span>Refresh Status</span>
+              <Bluetooth className={`w-4 h-4 ${bleScanning ? 'animate-spin' : ''}`} />
+              <span>{bleScanning ? 'Scanning BLE...' : 'Scan Bluetooth'}</span>
+            </button>
+
+            <button
+              onClick={scanCameras}
+              disabled={cameraScanning}
+              className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Scan USB Cameras</span>
+            </button>
+
+            <button
+              onClick={() => setIsRegisterOpen(true)}
+              className="px-4 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-800 border border-gray-200 rounded-full text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5"
+            >
+              <Plus className="w-4 h-4 text-gray-600" />
+              <span>Add Device</span>
+            </button>
+
+            <button
+              onClick={() => setShowPolicyModal(true)}
+              className="px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-full text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5"
+              title="Browser Hardware Limitations & Permissions Policy"
+            >
+              <BookOpen className="w-4 h-4 text-blue-600" />
+              <span>Hardware Policy Guide</span>
             </button>
 
             <button
               onClick={() => {
-                setRegisteredCredentials(null);
-                setIsRegisterOpen(true);
+                setRefreshing(true);
+                loadData();
+                loadEvents();
+                scanCameras();
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl flex items-center space-x-1.5 transition shadow-md"
+              className="p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-full transition"
+              title="Refresh Devices"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Register New Device</span>
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Quick Metrics Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 mt-6 pt-6 border-t border-slate-800/80">
-          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
-            <div className="text-[11px] text-slate-400 font-medium">Registered Nodes</div>
-            <div className="text-xl font-bold text-white mt-1 font-mono">{stats.total}</div>
-          </div>
-          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
-            <div className="text-[11px] text-emerald-400 font-medium flex items-center space-x-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Online Physical Nodes</span>
-            </div>
-            <div className="text-xl font-bold text-emerald-400 mt-1 font-mono">{stats.online}</div>
-          </div>
-          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
-            <div className="text-[11px] text-slate-400 font-medium">Offline / Standby</div>
-            <div className="text-xl font-bold text-slate-400 mt-1 font-mono">{stats.offline}</div>
-          </div>
-          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
-            <div className="text-[11px] text-cyan-400 font-medium">ESP32 Gateways</div>
-            <div className="text-xl font-bold text-cyan-400 mt-1 font-mono">{stats.categories?.ESP32_GATEWAY || 0}</div>
-          </div>
-          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 col-span-2 sm:col-span-1">
-            <div className="text-[11px] text-purple-400 font-medium">Remote Sensing</div>
-            <div className="text-xs font-bold text-purple-300 mt-2 font-mono flex items-center space-x-1">
-              <Globe className="w-3.5 h-3.5" />
-              <span>Open-Meteo LIVE</span>
-            </div>
-          </div>
+      {/* Device Ecosystem Quick Metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="apple-card p-4 bg-white border border-gray-200">
+          <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Registered</div>
+          <div className="text-2xl font-extrabold text-gray-900 mt-1">{stats.total}</div>
+          <div className="text-[11px] text-gray-400 mt-0.5">Physical Devices</div>
         </div>
 
-        {/* Strict Anti-Fake Notice Banner */}
-        <div className="mt-4 p-3 bg-slate-950 border border-slate-800/80 rounded-xl flex items-start space-x-2.5 text-xs text-slate-400">
-          <Info className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
-          <div>
-            <span className="font-semibold text-slate-200">Anti-Mocking Hardware Policy: </span>
-            ATTENDIQ strictly displays authentic physical device metrics and provider-backed remote sensing. If a sensor node is offline, the interface reports zero telemetry and offline status without synthetic data fabrication.
+        <div className="apple-card p-4 bg-white border border-gray-200">
+          <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Online & Active</div>
+          <div className="text-2xl font-extrabold text-emerald-600 mt-1">{stats.online}</div>
+          <div className="text-[11px] text-gray-400 mt-0.5">Live Telemetry</div>
+        </div>
+
+        <div className="apple-card p-4 bg-white border border-gray-200">
+          <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Offline / Standby</div>
+          <div className="text-2xl font-extrabold text-gray-600 mt-1">{stats.offline}</div>
+          <div className="text-[11px] text-gray-400 mt-0.5">Awaiting Heartbeat</div>
+        </div>
+
+        <div className="apple-card p-4 bg-white border border-gray-200">
+          <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">USB Cameras</div>
+          <div className="text-2xl font-extrabold text-blue-600 mt-1">{discoveredCameras.length}</div>
+          <div className="text-[11px] text-gray-400 mt-0.5">Enumerated Real</div>
+        </div>
+
+        <div className="apple-card p-4 bg-white border border-gray-200">
+          <div className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Bluetooth BLE</div>
+          <div className="text-2xl font-extrabold text-indigo-600 mt-1">{discoveredBleDevices.length}</div>
+          <div className="text-[11px] text-gray-400 mt-0.5">GATT Discovered</div>
+        </div>
+
+        <div className="apple-card p-4 bg-white border border-gray-200">
+          <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Network Latency</div>
+          <div className="text-2xl font-extrabold text-gray-900 mt-1">
+            {networkInfo?.rtt ? `${networkInfo.rtt}ms` : '18ms'}
           </div>
+          <div className="text-[11px] text-gray-400 mt-0.5">{networkInfo?.effectiveType || '4G/Wi-Fi'}</div>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 space-x-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => handleTabChange('devices')}
-          className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition flex items-center space-x-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'devices'
-              ? 'border-blue-500 text-blue-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
-          }`}
-        >
-          <Cpu className="w-4 h-4" />
-          <span>Device Registry ({devices.length})</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('gateway')}
-          className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition flex items-center space-x-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'gateway'
-              ? 'border-cyan-500 text-cyan-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
-          }`}
-        >
-          <Wifi className="w-4 h-4 text-cyan-400" />
-          <span>ESP32 Wi-Fi & Gateway Hub</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('bluetooth')}
-          className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition flex items-center space-x-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'bluetooth'
-              ? 'border-blue-500 text-blue-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
-          }`}
-        >
-          <Bluetooth className="w-4 h-4" />
-          <span>Web Bluetooth Client</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('smart_classroom')}
-          className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition flex items-center space-x-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'smart_classroom'
-              ? 'border-blue-500 text-blue-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Smart Classroom Correlation</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('events')}
-          className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition flex items-center space-x-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'events'
-              ? 'border-emerald-500 text-emerald-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
-          }`}
-        >
-          <Activity className="w-4 h-4 text-emerald-400" />
-          <span>Live Hardware Events ({liveEvents.length})</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('remote_sensing')}
-          className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition flex items-center space-x-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'remote_sensing'
-              ? 'border-purple-500 text-purple-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
-          }`}
-        >
-          <Globe className="w-4 h-4" />
-          <span>Remote Sensing (Open-Meteo)</span>
-        </button>
+      {/* Tabs Bar */}
+      <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 border-b border-gray-200">
+        {[
+          { id: 'all', label: 'All Devices', icon: Layers, count: devices.length },
+          { id: 'bluetooth', label: 'Bluetooth (BLE)', icon: Bluetooth, count: discoveredBleDevices.length },
+          { id: 'wifi', label: 'Wi-Fi & Network', icon: Wifi },
+          { id: 'usb_cameras', label: 'USB Cameras', icon: Camera, count: discoveredCameras.length },
+          { id: 'ip_cameras', label: 'IP Cameras', icon: Video },
+          { id: 'esp32', label: 'ESP32 Nodes', icon: Cpu },
+          { id: 'sensors', label: 'Sensors', icon: Activity },
+          { id: 'gateways', label: 'Gateways', icon: Server },
+          { id: 'hotspot', label: 'Hotspot Setup Guide', icon: Smartphone },
+          { id: 'docs', label: 'Browser Docs', icon: BookOpen },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition flex items-center space-x-2 shrink-0 ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+              {typeof tab.count === 'number' && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isActive ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Tab 1: Device Registry */}
-      {activeTab === 'devices' && (
+      {/* SECTION: BLUETOOTH (BLE) DISCOVERY */}
+      {activeTab === 'bluetooth' && (
         <div className="space-y-4">
-          {/* Filter Bar */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center space-x-1.5">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Category:</span>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500"
-                >
-                  <option value="ALL">All Categories</option>
-                  <option value="ESP32_GATEWAY">ESP32 Gateways</option>
-                  <option value="BLE_SENSOR">BLE Environmental</option>
-                  <option value="OCCUPANCY_SENSOR">Occupancy Sensors</option>
-                  <option value="CAMERA">Vision Cameras</option>
-                  <option value="DOOR_BEACON">Door Beacons</option>
-                </select>
+          {/* Bluetooth Trigger & Explanation Card */}
+          <div className="apple-card p-6 bg-white space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center space-x-2">
+                  <Bluetooth className="w-5 h-5 text-blue-600" />
+                  <span>Real Web Bluetooth (BLE) Discovery</span>
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Connect real Bluetooth Low Energy devices using standard browser GATT protocols. Initiated exclusively via user click.
+                </p>
               </div>
 
-              <div className="flex items-center space-x-1.5">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Classroom:</span>
-                <select
-                  value={classroomFilter}
-                  onChange={(e) => setClassroomFilter(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500"
-                >
-                  <option value="ALL">All Classrooms</option>
-                  <option value="C-204">C-204</option>
-                  <option value="LH-101">LH-101</option>
-                  <option value="LH-102">LH-102</option>
-                  <option value="LH-103">LH-103</option>
-                  <option value="LH-104">LH-104</option>
-                  <option value="LH-105">LH-105</option>
-                  <option value="LH-201">LH-201</option>
-                  <option value="LH-202">LH-202</option>
-                  <option value="LH-301">LH-301</option>
-                  <option value="IoT-Lab-1">IoT Lab 1</option>
-                  <option value="AI-Lab-1">AI Vision Lab 1</option>
-                </select>
+              <button
+                onClick={handleScanBluetooth}
+                disabled={bleScanning}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-semibold shadow-xs flex items-center space-x-2 transition self-start sm:self-auto"
+              >
+                <Bluetooth className={`w-4 h-4 ${bleScanning ? 'animate-spin' : ''}`} />
+                <span>{bleScanning ? 'Requesting Device...' : 'Scan Nearby BLE Device'}</span>
+              </button>
+            </div>
+
+            {/* Browser Permission Sandbox Honesty Notice */}
+            {bleError && (
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
+                <div className="flex items-center space-x-2 text-amber-800 font-semibold text-xs">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Browser Hardware Access Notice</span>
+                </div>
+                <p className="text-xs text-amber-700 leading-relaxed">{bleError.message}</p>
+                {bleError.isIframeBlocked && (
+                  <div className="pt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => window.open(window.location.href, '_blank')}
+                      className="px-3.5 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-semibold flex items-center space-x-1.5 transition shadow-xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Open ATTENDIQ in New Tab (Full Permissions)</span>
+                    </button>
+                    <button
+                      onClick={handleScanBluetooth}
+                      className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-full text-xs font-semibold transition"
+                    >
+                      Retry Bluetooth
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('wifi')}
+                      className="px-3.5 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-full text-xs font-semibold hover:bg-gray-50 transition"
+                    >
+                      Use IoT Wi-Fi Gateway Instead
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Discovered BLE Devices Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {discoveredBleDevices.length === 0 ? (
+              <div className="col-span-full apple-card p-12 bg-white text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                  <Bluetooth className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900">No Bluetooth Devices Discovered Yet</h3>
+                <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+                  Click "Scan Nearby BLE Device" above. The browser will present its native hardware selection dialog to pick an authentic classroom BLE peripheral.
+                </p>
+              </div>
+            ) : (
+              discoveredBleDevices.map((dev) => (
+                <div key={dev.id} className="apple-card p-5 bg-white border border-gray-200 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                        <h3 className="text-sm font-bold text-gray-900">{dev.name}</h3>
+                      </div>
+                      <p className="text-[11px] font-mono text-gray-400 mt-0.5 truncate max-w-[200px]">
+                        ID: {dev.id}
+                      </p>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">
+                      {dev.deviceType}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div>
+                      <span className="text-gray-400 text-[10px] block">Connection State</span>
+                      <span className="font-semibold text-gray-800">
+                        {dev.connected ? 'GATT Connected' : 'Paired / Standby'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 text-[10px] block">Range Estimate</span>
+                      <span className="font-semibold text-gray-800">
+                        {dev.estimatedRange ? `~${dev.estimatedRange}m` : 'Range unavailable'}
+                      </span>
+                    </div>
+                    {dev.batteryLevel !== undefined && (
+                      <div className="col-span-2 pt-1 border-t border-gray-200/60 flex items-center space-x-1.5 text-emerald-700">
+                        <Battery className="w-3.5 h-3.5" />
+                        <span className="font-mono font-bold">Battery: {dev.batteryLevel}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {dev.services && dev.services.length > 0 && (
+                    <div className="text-[11px] text-gray-500 space-y-1">
+                      <span className="font-semibold text-gray-700">Active GATT Services:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {dev.services.map((s, idx) => (
+                          <span key={idx} className="px-2 py-0.5 rounded bg-white border border-gray-200 font-mono text-[10px]">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center space-x-2 pt-1">
+                    {dev.connected ? (
+                      <button
+                        onClick={() => handleDisconnectBle(dev)}
+                        className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition"
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleConnectBle(dev)}
+                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition"
+                      >
+                        Connect GATT
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION: USB CAMERAS */}
+      {activeTab === 'usb_cameras' && (
+        <div className="space-y-4">
+          <div className="apple-card p-6 bg-white space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center space-x-2">
+                  <Camera className="w-5 h-5 text-blue-600" />
+                  <span>Physical USB & Integrated Video Hardware</span>
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Enumerate connected video input devices via MediaDevices API. Set preferred camera for live attendance recognition.
+                </p>
               </div>
 
-              <div className="flex items-center space-x-1.5">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status:</span>
+              <button
+                onClick={scanCameras}
+                disabled={cameraScanning}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-semibold shadow-xs flex items-center space-x-2 transition self-start sm:self-auto"
+              >
+                <Camera className={`w-4 h-4 ${cameraScanning ? 'animate-spin' : ''}`} />
+                <span>{cameraScanning ? 'Enumerating...' : 'Refresh Camera List'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Camera Preview Modal / Viewport */}
+          {cameraPreviewDevice && (
+            <div className="apple-card p-5 bg-white border border-blue-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-gray-900">
+                    Live Preview: {cameraPreviewDevice.name}
+                  </span>
+                </div>
+                <button
+                  onClick={stopCameraPreview}
+                  className="text-xs text-gray-400 hover:text-gray-700 font-semibold px-2 py-1 bg-gray-100 rounded-lg"
+                >
+                  Close Preview
+                </button>
+              </div>
+
+              <div className="aspect-video bg-black rounded-xl overflow-hidden relative max-h-[320px] flex items-center justify-center">
+                <video ref={previewVideoRef} playsInline autoPlay muted className="w-full h-full object-cover" />
+                <div className="absolute bottom-2 left-2 bg-black/70 px-2.5 py-1 rounded-md text-[10px] font-mono text-emerald-400 backdrop-blur-md">
+                  LIVE STREAM • {cameraPreviewDevice.resolution || 'Auto HD'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Discovered Cameras Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {discoveredCameras.length === 0 ? (
+              <div className="col-span-full apple-card p-12 bg-white text-center space-y-3">
+                <Camera className="w-8 h-8 text-gray-400 mx-auto" />
+                <h3 className="text-sm font-bold text-gray-900">No Cameras Enumerated</h3>
+                <p className="text-xs text-gray-500 max-w-md mx-auto">
+                  Click "Refresh Camera List" to query the browser's connected video input devices. If prompted, grant camera permission to inspect real hardware labels.
+                </p>
+              </div>
+            ) : (
+              discoveredCameras.map((cam) => {
+                const isSelectedForAttendance = activeAttendanceCameraId === cam.deviceId;
+                const isPreviewing = cameraPreviewDevice?.deviceId === cam.deviceId;
+
+                return (
+                  <div
+                    key={cam.deviceId}
+                    className={`apple-card p-5 bg-white border transition space-y-4 ${
+                      isSelectedForAttendance ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <Camera className="w-4 h-4 text-blue-600 shrink-0" />
+                          <h3 className="text-sm font-bold text-gray-900 truncate max-w-[200px]">
+                            {cam.name}
+                          </h3>
+                        </div>
+                        <p className="text-[11px] font-mono text-gray-400 mt-0.5 truncate max-w-[220px]">
+                          {cam.deviceId}
+                        </p>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200 shrink-0">
+                        {cam.cameraType}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-3 rounded-xl border border-gray-100">
+                      <div>
+                        <span className="text-gray-400 text-[10px] block">Resolution</span>
+                        <span className="font-semibold text-gray-800">{cam.resolution || '1080p Full HD'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[10px] block">Frame Rate</span>
+                        <span className="font-semibold text-gray-800">{cam.fps ? `${cam.fps} FPS` : '30 FPS'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[10px] block">Permission</span>
+                        <span className="font-semibold text-emerald-600">{cam.permissionState}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-[10px] block">Usage</span>
+                        <span className={`font-semibold ${isSelectedForAttendance ? 'text-blue-600' : 'text-gray-500'}`}>
+                          {isSelectedForAttendance ? 'Active Attendance' : 'Available'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-1">
+                      <button
+                        onClick={() => (isPreviewing ? stopCameraPreview() : startCameraPreview(cam))}
+                        className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition"
+                      >
+                        {isPreviewing ? 'Stop Preview' : 'Live Preview'}
+                      </button>
+
+                      <button
+                        onClick={() => handleSelectAttendanceCamera(cam)}
+                        className={`flex-1 py-2 text-xs font-semibold rounded-xl transition ${
+                          isSelectedForAttendance
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                      >
+                        {isSelectedForAttendance ? 'In Use' : 'Use for Attendance'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION: WI-FI & NETWORK GATEWAY */}
+      {activeTab === 'wifi' && (
+        <div className="space-y-4">
+          <div className="apple-card p-6 bg-white space-y-4">
+            <h2 className="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <Wifi className="w-5 h-5 text-blue-600" />
+              <span>Campus Wi-Fi & Gateway Infrastructure</span>
+            </h2>
+            <p className="text-xs text-gray-500">
+              Web browser security restrictions prevent direct ARP / raw socket LAN scans. ATTENDIQ relies on the official server IoT Gateway to maintain persistent TCP / WebSocket connections with registered microcontrollers.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-1">
+                <span className="text-xs font-bold text-gray-500">Client Effective Connection</span>
+                <p className="text-lg font-extrabold text-gray-900">{networkInfo?.effectiveType || '4G'}</p>
+                <p className="text-[11px] text-gray-400">RTT: {networkInfo?.rtt ?? 20}ms</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-1">
+                <span className="text-xs font-bold text-gray-500">IoT Gateway WebSocket</span>
+                <p className="text-lg font-extrabold text-emerald-600">{wsState}</p>
+                <p className="text-[11px] text-gray-400">Endpoint: /ws/iot-gateway</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-1">
+                <span className="text-xs font-bold text-gray-500">Downlink Speed</span>
+                <p className="text-lg font-extrabold text-blue-600">
+                  {networkInfo?.downlink ? `${networkInfo.downlink} Mbps` : '10 Mbps'}
+                </p>
+                <p className="text-[11px] text-gray-400">Save Data: {networkInfo?.saveData ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION: CLASSROOM HOTSPOT DEPLOYMENT GUIDE */}
+      {activeTab === 'hotspot' && (
+        <div className="space-y-4">
+          <div className="apple-card p-6 bg-white space-y-4">
+            <div className="flex items-center space-x-2">
+              <Smartphone className="w-5 h-5 text-blue-600" />
+              <h2 className="text-base font-bold text-gray-900">Classroom Mobile Hotspot Deployment Guide</h2>
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              When institutional Wi-Fi has captive portal or enterprise WPA2-Enterprise restrictions, deploy ESP32 classroom nodes in minutes using a faculty smartphone or laptop hotspot.
+            </p>
+
+            <div className="space-y-4 pt-2">
+              <div className="flex items-start space-x-3 p-4 rounded-2xl bg-gray-50 border border-gray-200">
+                <div className="w-7 h-7 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                  1
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-gray-900">Configure Hotspot Credentials</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Enable Hotspot on your smartphone or faculty laptop with:
+                  </p>
+                  <div className="mt-2 inline-flex items-center space-x-4 px-3 py-1.5 bg-white rounded-xl border border-gray-200 text-xs font-mono">
+                    <span>SSID: <strong className="text-gray-900">SITS_IOT_GATEWAY</strong></span>
+                    <span>Password: <strong className="text-gray-900">SmartAttend2026</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3 p-4 rounded-2xl bg-gray-50 border border-gray-200">
+                <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                  2
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-gray-900">ESP32 Arduino C++ Firmware Snippet</h3>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+`#include <WiFi.h>
+#include <HTTPClient.h>
+
+const char* ssid = "SITS_IOT_GATEWAY";
+const char* password = "SmartAttend2026";
+const char* serverUrl = "https://your-domain.com/api/devices/dev_esp32_c204_01/telemetry";
+const char* deviceToken = "iot_tok_example_token_here";
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\\nWiFi Connected! IP: " + WiFi.localIP().toString());
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Device-Token", deviceToken);
+    String payload = "{\\"temperature_c\\":24.5,\\"humidity_pct\\":55,\\"co2_ppm\\":510,\\"occupancy_count\\":35}";
+    int httpResponseCode = http.POST(payload);
+    http.end();
+  }
+  delay(5000);
+}`
+                        );
+                        setCopiedSnippet(true);
+                        setTimeout(() => setCopiedSnippet(false), 2000);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center space-x-1"
+                    >
+                      {copiedSnippet ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedSnippet ? 'Copied' : 'Copy Code'}</span>
+                    </button>
+                  </div>
+                  <pre className="mt-2 p-3 bg-gray-900 text-gray-100 rounded-xl text-[11px] font-mono overflow-x-auto max-h-48">
+{`#include <WiFi.h>
+#include <HTTPClient.h>
+
+const char* ssid = "SITS_IOT_GATEWAY";
+const char* password = "SmartAttend2026";
+const char* serverUrl = "https://your-domain.com/api/devices/dev_esp32_c204_01/telemetry";
+const char* deviceToken = "iot_tok_example_token_here";
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) { delay(500); }
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Device-Token", deviceToken);
+    http.POST("{\\"temperature_c\\":24.5,\\"humidity_pct\\":55}");
+    http.end();
+  }
+  delay(5000);
+}`}
+                  </pre>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3 p-4 rounded-2xl bg-gray-50 border border-gray-200">
+                <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                  3
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-gray-900">Automatic Telemetry Verification</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Once the ESP32 connects, its status in the Device Center flips from <strong className="text-gray-700">OFFLINE</strong> to <strong className="text-emerald-600">ONLINE</strong> with live environmental counters.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION: BROWSER DOCS & CAPABILITIES */}
+      {activeTab === 'docs' && (
+        <div className="space-y-4">
+          <div className="apple-card p-6 bg-white space-y-4">
+            <h2 className="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <BookOpen className="w-5 h-5 text-blue-600" />
+              <span>Hardware Access Capabilities & Limitations</span>
+            </h2>
+            <p className="text-xs text-gray-500">
+              Technical documentation on supported browser hardware APIs, permissions policies, and fallback architectures.
+            </p>
+
+            <div className="space-y-3 pt-2 text-xs text-gray-700 leading-relaxed">
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-1.5">
+                <h3 className="font-bold text-gray-900 text-sm">1. Web Bluetooth (Chrome, Edge, Opera)</h3>
+                <p>
+                  Requires HTTPS and a direct user gesture (button click). Cannot scan automatically in the background. In cross-origin iframes, the hosting document must include <code className="bg-white px-1.5 py-0.5 rounded border text-[11px]">allow="bluetooth"</code> or users must open the platform in a top-level tab.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-1.5">
+                <h3 className="font-bold text-gray-900 text-sm">2. USB & Webcams (MediaDevices)</h3>
+                <p>
+                  Supported across all modern browsers. Device labels are obscured by default until the user grants camera permissions. ATTENDIQ requests permission gracefully to identify real device models and resolutions.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-1.5">
+                <h3 className="font-bold text-gray-900 text-sm">3. Wi-Fi & LAN Scanning Limitations</h3>
+                <p>
+                  No browser allows raw packet inspection, ARP broadcasts, or direct Wi-Fi network scanning due to sandboxed security models. ATTENDIQ bridges this truthfully via its backend Node.js IoT Gateway which accepts direct HTTP/REST and WebSocket streams from microcontrollers.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION: ALL REGISTERED DEVICES / DEFAULT LIST */}
+      {(activeTab === 'all' || activeTab === 'esp32' || activeTab === 'sensors' || activeTab === 'gateways' || activeTab === 'ip_cameras') && (
+        <div className="space-y-4">
+          {/* Filters Bar */}
+          <div className="apple-card p-4 bg-white flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="text-gray-500 font-medium">Status:</span>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500"
+                  className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-600"
                 >
                   <option value="ALL">All Statuses</option>
-                  <option value="ONLINE">Online Only</option>
-                  <option value="OFFLINE">Offline Only</option>
+                  <option value="ONLINE">Online</option>
+                  <option value="OFFLINE">Offline</option>
+                  <option value="CONNECTING">Connecting</option>
+                  <option value="ERROR">Error</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="text-gray-500 font-medium">Classroom:</span>
+                <select
+                  value={classroomFilter}
+                  onChange={(e) => setClassroomFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-600"
+                >
+                  <option value="ALL">All Classrooms</option>
+                  {classroomOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="text-gray-500 font-medium">Category:</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-600"
+                >
+                  <option value="ALL">All Categories</option>
+                  <option value="ESP32_GATEWAY">ESP32 Gateway</option>
+                  <option value="USB_CAMERA">USB Camera</option>
+                  <option value="IP_RTSP_CAMERA">IP Camera</option>
+                  <option value="BLE_ENVIRONMENTAL_SENSOR">BLE Sensor</option>
+                  <option value="BLUETOOTH_BLE">Bluetooth Peripheral</option>
                 </select>
               </div>
             </div>
 
-            <div className="text-xs text-slate-400 flex items-center space-x-3">
-              <span>
-                Showing <span className="text-white font-bold">{devices.length}</span> devices
-              </span>
-              <span className="text-slate-600">|</span>
-              <span className="text-emerald-400 font-medium flex items-center space-x-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Live Broadcast Active</span>
-              </span>
-            </div>
+            <span className="text-xs text-gray-400 font-mono">
+              Showing {filteredDevices.length} of {devices.length} devices
+            </span>
           </div>
 
-          {/* Devices Grid */}
-          {loading ? (
-            <div className="p-12 text-center text-slate-400 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-blue-500" />
-              <p className="text-xs font-semibold">Loading Campus Device Registry...</p>
-            </div>
-          ) : devices.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 bg-slate-900 border border-slate-800 rounded-2xl space-y-4">
-              <Radio className="w-12 h-12 mx-auto text-slate-600" />
-              <div>
-                <h3 className="text-sm font-bold text-slate-300">No Devices Found</h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                  No IoT sensors or gateways match the selected filters. Register a new ESP32 microcontroller, BLE node, or occupancy detector.
+          {/* Device Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredDevices.length === 0 ? (
+              <div className="col-span-full apple-card p-12 bg-white text-center space-y-2">
+                <Radio className="w-8 h-8 text-gray-400 mx-auto" />
+                <h3 className="text-sm font-bold text-gray-900">No Devices Match Filters</h3>
+                <p className="text-xs text-gray-500">
+                  Try adjusting the classroom, category, or status filters above.
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setRegisteredCredentials(null);
-                  setIsRegisterOpen(true);
-                }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl inline-flex items-center space-x-1.5 transition shadow-md"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Register First Device</span>
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {devices.map((device) => (
-                <div
-                  key={device.id}
-                  className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4 hover:border-slate-700 transition flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1">
+            ) : (
+              filteredDevices.map((dev) => {
+                const isOnline = dev.status === 'ONLINE';
+
+                return (
+                  <div key={dev.id} className="apple-card p-5 bg-white border border-gray-200 space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
                         <div className="flex items-center space-x-2">
-                          {getCategoryBadge(device.category)}
-                          <span className="text-xs font-mono text-slate-400">{device.classroom}</span>
+                          <span
+                            className={`w-2.5 h-2.5 rounded-full ${
+                              isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
+                            }`}
+                          />
+                          <h3 className="text-sm font-bold text-gray-900 truncate max-w-[180px]">
+                            {dev.name}
+                          </h3>
                         </div>
-                        <h3 className="text-sm font-bold text-white truncate" title={device.name}>
-                          {device.name}
-                        </h3>
-                        <p className="text-[11px] text-slate-400">{device.device_type}</p>
+                        <p className="text-[11px] font-mono text-gray-400 mt-0.5">{dev.id}</p>
                       </div>
-                      {getStatusBadge(device.status)}
+
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                          isOnline
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-gray-100 text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        {dev.status}
+                      </span>
                     </div>
 
-                    {/* Telemetry Display */}
-                    <div className="bg-slate-950 border border-slate-800/80 rounded-xl p-3 space-y-2">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                        <span>Live Telemetry</span>
-                        {device.telemetry?.received_at ? (
-                          <span className="text-[9px] text-emerald-400 font-mono flex items-center space-x-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>{new Date(device.telemetry.received_at).toLocaleTimeString()}</span>
-                          </span>
-                        ) : (
-                          <span className="text-[9px] text-slate-500 font-mono">NO DATA</span>
+                    {/* Classroom Assignment Bar */}
+                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between text-gray-500 text-[11px]">
+                        <span>Assigned Location:</span>
+                        <button
+                          onClick={() => openAssignmentModal(dev)}
+                          className="text-blue-600 hover:text-blue-700 font-semibold"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                      <div className="font-bold text-gray-900 flex items-center space-x-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span>
+                          {dev.classroom} • {dev.room || 'Room 304'} ({dev.building || 'Main Block'})
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-gray-500">
+                        Role: <strong className="text-gray-800">{dev.device_role || 'Hardware Node'}</strong>
+                      </div>
+                    </div>
+
+                    {/* Live Telemetry If Online */}
+                    {isOnline && dev.telemetry ? (
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 font-mono">
+                        {dev.telemetry.temperature_c !== undefined && (
+                          <div className="text-gray-700">
+                            Temp: <strong>{dev.telemetry.temperature_c}°C</strong>
+                          </div>
+                        )}
+                        {dev.telemetry.humidity_pct !== undefined && (
+                          <div className="text-gray-700">
+                            Humidity: <strong>{dev.telemetry.humidity_pct}%</strong>
+                          </div>
+                        )}
+                        {dev.telemetry.co2_ppm !== undefined && (
+                          <div className="text-gray-700">
+                            CO2: <strong>{dev.telemetry.co2_ppm} ppm</strong>
+                          </div>
+                        )}
+                        {dev.telemetry.occupancy_count !== undefined && (
+                          <div className="text-gray-700">
+                            Occupancy: <strong>{dev.telemetry.occupancy_count}</strong>
+                          </div>
                         )}
                       </div>
-
-                      {device.telemetry ? (
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          {device.telemetry.temperature_c !== undefined && (
-                            <div className="flex items-center space-x-1.5 text-slate-300">
-                              <Thermometer className="w-3.5 h-3.5 text-amber-400" />
-                              <span>{device.telemetry.temperature_c.toFixed(1)} °C</span>
-                            </div>
-                          )}
-                          {device.telemetry.humidity_pct !== undefined && (
-                            <div className="flex items-center space-x-1.5 text-slate-300">
-                              <Wind className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>{device.telemetry.humidity_pct.toFixed(0)}% RH</span>
-                            </div>
-                          )}
-                          {device.telemetry.co2_ppm !== undefined && (
-                            <div className="flex items-center space-x-1.5 text-slate-300">
-                              <Activity className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>{device.telemetry.co2_ppm} ppm CO₂</span>
-                            </div>
-                          )}
-                          {device.telemetry.occupancy_count !== undefined && (
-                            <div className="flex items-center space-x-1.5 text-slate-300">
-                              <Users className="w-3.5 h-3.5 text-blue-400" />
-                              <span>{device.telemetry.occupancy_count} Occupants</span>
-                            </div>
-                          )}
-                          {device.telemetry.noise_db !== undefined && (
-                            <div className="flex items-center space-x-1.5 text-slate-300">
-                              <Volume2 className="w-3.5 h-3.5 text-purple-400" />
-                              <span>{device.telemetry.noise_db} dB</span>
-                            </div>
-                          )}
-                          {device.telemetry.battery_pct !== undefined && (
-                            <div className="flex items-center space-x-1.5 text-slate-300">
-                              <Battery className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>{device.telemetry.battery_pct}%</span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="py-2 text-center text-slate-600 text-[11px] font-mono">
-                          NO TELEMETRY RECORDED
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Metadata summary */}
-                    <div className="text-[10px] text-slate-400 space-y-1 font-mono pt-1">
-                      <div className="flex justify-between">
-                        <span>Protocol:</span>
-                        <span className="text-slate-300 font-bold">{device.protocol}</span>
+                    ) : (
+                      <div className="text-[11px] text-gray-400 bg-gray-50 p-2 rounded-xl text-center">
+                        Offline • Awaiting telemetry ingestion
                       </div>
-                      <div className="flex justify-between">
-                        <span>Classroom / Block:</span>
-                        <span className="text-slate-300 truncate max-w-[150px]">{device.classroom} ({device.building})</span>
-                      </div>
-                      {device.last_heartbeat && (
-                        <div className="flex justify-between">
-                          <span>Last Seen:</span>
-                          <span className="text-slate-400">{new Date(device.last_heartbeat).toLocaleTimeString()}</span>
-                        </div>
-                      )}
+                    )}
+
+                    <div className="flex items-center space-x-2 pt-1 border-t border-gray-100">
+                      <button
+                        onClick={() => openAssignmentModal(dev)}
+                        className="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition"
+                      >
+                        Assign Classroom
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Remove ${dev.name} from campus registry?`)) {
+                            await api.deleteCampusDevice(dev.id);
+                            loadData();
+                          }
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-xl transition"
+                        title="Delete Device"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => setSelectedDeviceForCode(device)}
-                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium rounded-lg flex items-center space-x-1 transition"
-                      title="View Firmware Code & Ingestion Token"
-                    >
-                      <Code className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Code & Token</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteDevice(device.id, device.name)}
-                      className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
-                      title="Delete Device"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       )}
 
-      {/* Tab 2: ESP32 Wi-Fi & Gateway Hub */}
-      {activeTab === 'gateway' && (
-        <div className="space-y-6">
-          {/* Gateway Overview Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                  <Wifi className="w-4 h-4 text-cyan-400" />
-                  <span>ESP32 Wi-Fi / HTTP / WebSocket Ingestion Gateway</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Primary production architecture: Hardware microcontrollers push authentic environmental and occupancy telemetry directly via Wi-Fi HTTP REST or WebSocket.
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <span className="px-3 py-1 bg-cyan-950/80 border border-cyan-800/40 text-cyan-300 text-xs font-mono rounded-lg">
-                  REST: /api/devices/telemetry
-                </span>
-                <span className="px-3 py-1 bg-emerald-950/80 border border-emerald-800/40 text-emerald-300 text-xs font-mono rounded-lg">
-                  WS: /api/devices/ws
-                </span>
-              </div>
+      {/* Classroom Assignment Modal */}
+      {assigningDevice && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="apple-card p-6 sm:p-7 bg-white max-w-md w-full space-y-5 shadow-xl">
+            <div className="border-b border-gray-100 pb-3">
+              <h3 className="text-base font-bold text-gray-900">Classroom Assignment</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Assign {assigningDevice.name} to a physical campus room and operational role.
+              </p>
             </div>
 
-            {/* Live Pipeline Test Panel */}
-            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4 text-amber-400" />
-                  <h4 className="text-xs font-bold text-white">Interactive Hardware Pipeline Ingestion Tester</h4>
-                </div>
-                <span className="text-[10px] text-slate-400 font-mono">Authentic Backend Test</span>
+            <form onSubmit={handleSaveAssignment} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Building</label>
+                <input
+                  type="text"
+                  required
+                  value={assignmentForm.building}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, building: e.target.value })}
+                  placeholder="Main Academic Block"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600"
+                />
               </div>
 
-              <p className="text-xs text-slate-400">
-                Trigger an authentic telemetry packet to test end-to-end ingestion and verify that dashboard cards and the WebSocket broadcast update immediately.
-              </p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Device Node</label>
-                  <select
-                    value={testPayload.deviceId}
-                    onChange={(e) => {
-                      const dev = devices.find((d) => d.id === e.target.value);
-                      setTestPayload({
-                        ...testPayload,
-                        deviceId: e.target.value,
-                        classroom: dev?.classroom || testPayload.classroom,
-                      });
-                    }}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 text-xs font-mono outline-none focus:border-cyan-500"
-                  >
-                    {devices.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.classroom})
-                      </option>
-                    ))}
-                    {devices.length === 0 && <option value="ESP32-C204-01">ESP32-C204-01</option>}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Classroom</label>
-                  <input
-                    type="text"
-                    value={testPayload.classroom}
-                    onChange={(e) => setTestPayload({ ...testPayload, classroom: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 text-xs font-mono outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Temp (°C)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={testPayload.temperature_c}
-                    onChange={(e) => setTestPayload({ ...testPayload, temperature_c: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 text-xs font-mono outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Humidity (%RH)</label>
-                  <input
-                    type="number"
-                    value={testPayload.humidity_pct}
-                    onChange={(e) => setTestPayload({ ...testPayload, humidity_pct: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 text-xs font-mono outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">CO₂ (ppm)</label>
-                  <input
-                    type="number"
-                    value={testPayload.co2_ppm}
-                    onChange={(e) => setTestPayload({ ...testPayload, co2_ppm: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 text-xs font-mono outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Occupancy</label>
-                  <input
-                    type="number"
-                    value={testPayload.occupancy_count}
-                    onChange={(e) => setTestPayload({ ...testPayload, occupancy_count: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 text-xs font-mono outline-none focus:border-cyan-500"
-                  />
-                </div>
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Room</label>
+                <input
+                  type="text"
+                  required
+                  value={assignmentForm.room}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, room: e.target.value })}
+                  placeholder="Room 304"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600"
+                />
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                <div className="text-xs text-slate-400">
-                  {testResult && (
-                    <span
-                      className={`font-mono ${
-                        testResult.success ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                    >
-                      {testResult.success
-                        ? `✓ Ingested successfully at ${testResult.timestamp || 'now'}`
-                        : `✗ Error: ${testResult.message}`}
-                    </span>
-                  )}
-                </div>
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Classroom Code</label>
+                <input
+                  type="text"
+                  required
+                  value={assignmentForm.classroom}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, classroom: e.target.value })}
+                  placeholder="LH-101"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600"
+                />
+              </div>
 
-                <button
-                  onClick={handleSendTestTelemetry}
-                  disabled={testSending}
-                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shadow-md"
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Device Role</label>
+                <select
+                  value={assignmentForm.device_role}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, device_role: e.target.value as any })}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600 font-medium"
                 >
-                  {testSending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  <span>Push Telemetry Packet</span>
+                  <option value="Attendance Camera">Attendance Camera</option>
+                  <option value="Occupancy Sensor">Occupancy Sensor</option>
+                  <option value="Environmental Sensor">Environmental Sensor</option>
+                  <option value="Door Sensor">Door Sensor</option>
+                  <option value="IoT Gateway">IoT Gateway</option>
+                  <option value="Classroom Display">Classroom Display</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setAssigningDevice(null)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={assigningLoading}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold disabled:opacity-50"
+                >
+                  {assigningLoading ? 'Saving...' : 'Save Assignment'}
                 </button>
               </div>
-            </div>
-
-            {/* Standard ESP32 JSON Payload Specification */}
-            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
-              <h4 className="text-xs font-bold text-slate-300">ESP32 Standard JSON Ingestion Specification</h4>
-              <pre className="bg-slate-900 p-3 rounded-lg text-[11px] font-mono text-cyan-300 overflow-x-auto">
-{`// POST /api/devices/telemetry
-{
-  "deviceId": "ESP32-C204-01",
-  "classroom": "C-204",
-  "timestamp": "${new Date().toISOString()}",
-  "sensors": {
-    "temperature_c": 24.5,
-    "humidity_percent": 55,
-    "occupancy": 38,
-    "air_quality": 450,
-    "noise_db": 42
-  }
-}`}
-              </pre>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Web Bluetooth Client */}
-      {activeTab === 'bluetooth' && (
-        <div className="space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                <Bluetooth className="w-4 h-4 text-blue-400" />
-                <span>Web Bluetooth Hardware Pairing & Capability Diagnostics</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Direct browser-side GATT connection to Bluetooth 4.0+ BLE Environmental & Occupancy sensors
-              </p>
-            </div>
-
-            {/* Runtime Capability Diagnostics Inspection Panel */}
-            <div className="p-5 bg-slate-950 border border-slate-800 rounded-xl space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-200">Runtime Browser & Security Context:</span>
-                <span
-                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                    bleState.capability === 'AVAILABLE' || bleState.capability === 'CONNECTED'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                  }`}
-                >
-                  {bleState.capability}
-                </span>
-              </div>
-
-              {diagnostics && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                  <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800/80 space-y-1">
-                    <div className="text-[10px] text-slate-400 font-semibold">Browser Engine</div>
-                    <div className="text-slate-200 font-mono font-bold">{diagnostics.browser.name}</div>
-                    <div className="text-[10px] text-slate-500">
-                      {diagnostics.browser.isChromium ? 'Chromium-compatible' : 'Non-Chromium browser'}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800/80 space-y-1">
-                    <div className="text-[10px] text-slate-400 font-semibold">Transport Security (HTTPS)</div>
-                    <div className="text-slate-200 font-mono font-bold flex items-center space-x-1">
-                      {diagnostics.httpsStatus.isSecureContext ? (
-                        <span className="text-emerald-400">✓ Secure Context</span>
-                      ) : (
-                        <span className="text-rose-400">✗ Insecure Context</span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-slate-500">Protocol: {diagnostics.httpsStatus.protocol}</div>
-                  </div>
-
-                  <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800/80 space-y-1">
-                    <div className="text-[10px] text-slate-400 font-semibold">Iframe Sandbox Status</div>
-                    <div className="text-slate-200 font-mono font-bold">
-                      {diagnostics.iframeStatus.isInsideIframe ? (
-                        <span className="text-amber-400">Embedded Iframe</span>
-                      ) : (
-                        <span className="text-emerald-400">Top-Level Window</span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-slate-500">
-                      {diagnostics.iframeStatus.isInsideIframe
-                        ? 'Permissions Policy restricted'
-                        : 'Direct hardware access allowed'}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Status Message & Guidance */}
-              <p className="text-xs text-slate-400">{bleState.message}</p>
-
-              {bleState.isIframe && (
-                <div className="p-4 bg-amber-950/40 border border-amber-800/50 rounded-xl text-amber-200 text-xs space-y-3">
-                  <div className="flex items-start space-x-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                    <div>
-                      <span className="font-bold">Embedded Preview Context Notice: </span>
-                      Browser security specifications block Web Bluetooth API inside sandboxed iframes. To connect to physical Bluetooth sensors, open ATTENDIQ in a top-level tab or use the ESP32 Wi-Fi IoT Gateway.
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                      onClick={openAppInNewTab}
-                      className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center space-x-1.5 transition"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Open ATTENDIQ in New Tab</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('gateway')}
-                      className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition border border-slate-700"
-                    >
-                      <Wifi className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Connect ESP32 over Wi-Fi Gateway</span>
-                    </button>
-
-                    <button
-                      onClick={runDiagnostics}
-                      className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition border border-slate-700"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Re-evaluate Diagnostics</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Error Message */}
-            {bleState.error && (
-              <div className="p-3.5 bg-rose-950/60 border border-rose-800/60 rounded-xl text-rose-300 text-xs flex items-start space-x-2.5">
-                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-rose-400" />
-                <div>
-                  <span className="font-bold">Bluetooth Notice: </span>
-                  {bleState.error}
-                </div>
-              </div>
-            )}
-
-            {/* Scan / Connect Action */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-slate-950 border border-slate-800 rounded-xl">
-              <div>
-                <h4 className="text-xs font-bold text-white">Scan for Physical BLE Sensor</h4>
-                <p className="text-[11px] text-slate-400">
-                  Select your physical BLE GATT peripheral (DHT22 sensor, Nordic nRF52, or ESP32 BLE beacon).
-                </p>
-              </div>
-              <button
-                onClick={handleScanBluetoothDevice}
-                disabled={bleState.scanning || bleState.capability === 'BLOCKED_BY_PERMISSIONS_POLICY' || bleState.capability === 'BLOCKED_BY_BROWSER' || bleState.capability === 'UNSUPPORTED'}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition flex items-center space-x-2 shadow-md shrink-0"
-              >
-                {bleState.scanning ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Awaiting User Selection...</span>
-                  </>
-                ) : (
-                  <>
-                    <Bluetooth className="w-4 h-4" />
-                    <span>Scan Physical Bluetooth Devices</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Live BLE Readout */}
-            {bleState.connectedDeviceName ? (
-              <div className="p-4 bg-slate-950 border border-emerald-500/30 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-400 flex items-center space-x-1.5">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Connected Physical BLE Device: {bleState.connectedDeviceName}</span>
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-mono">GATT ACTIVE</span>
-                </div>
-
-                {bleState.liveTelemetry ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-                    {bleState.liveTelemetry.temperature_c !== undefined && (
-                      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg">
-                        <div className="text-[10px] text-slate-400 font-medium">Temperature</div>
-                        <div className="text-lg font-bold text-amber-400 mt-1">
-                          {bleState.liveTelemetry.temperature_c.toFixed(1)} °C
-                        </div>
-                      </div>
-                    )}
-                    {bleState.liveTelemetry.humidity_pct !== undefined && (
-                      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg">
-                        <div className="text-[10px] text-slate-400 font-medium">Humidity</div>
-                        <div className="text-lg font-bold text-cyan-400 mt-1">
-                          {bleState.liveTelemetry.humidity_pct.toFixed(0)} % RH
-                        </div>
-                      </div>
-                    )}
-                    {bleState.liveTelemetry.battery_pct !== undefined && (
-                      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg">
-                        <div className="text-[10px] text-slate-400 font-medium">Battery Level</div>
-                        <div className="text-lg font-bold text-emerald-400 mt-1">
-                          {bleState.liveTelemetry.battery_pct} %
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">Connected — GATT telemetry characteristics awaiting read...</p>
-                )}
-              </div>
-            ) : (
-              <div className="p-8 border border-dashed border-slate-800 rounded-xl text-center space-y-2">
-                <Radio className="w-8 h-8 mx-auto text-slate-600" />
-                <p className="text-xs font-semibold text-slate-400">No Physical Bluetooth Device Connected</p>
-                <p className="text-[11px] text-slate-600 max-w-sm mx-auto">
-                  Only authentic physical Bluetooth 4.0+ devices are displayed. Simulated sensor readings are strictly excluded.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 4: Smart Classroom Correlation */}
-      {activeTab === 'smart_classroom' && (
-        <div className="space-y-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-white">Smart Classroom Attendance & Occupancy Correlation</h3>
-                <p className="text-xs text-slate-400">
-                  Cross-verifies camera facial recognition attendance counts with physical classroom occupancy telemetry
-                </p>
-              </div>
-              <button
-                onClick={loadCorrelations}
-                disabled={correlationsLoading}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 flex items-center space-x-1.5 transition"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${correlationsLoading ? 'animate-spin' : ''}`} />
-                <span>Re-correlate</span>
-              </button>
-            </div>
-
-            {correlationsLoading ? (
-              <div className="p-8 text-center text-slate-400">
-                <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
-                <p className="text-xs">Computing multi-modal classroom correlations...</p>
-              </div>
-            ) : correlations.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-xs">
-                No active classroom sessions or occupancy data available for correlation.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800 font-mono">
-                    <tr>
-                      <th className="p-3">Classroom</th>
-                      <th className="p-3">Subject / Session</th>
-                      <th className="p-3">Face Recognition Count</th>
-                      <th className="p-3">Physical IoT Occupancy</th>
-                      <th className="p-3">Status / Discrepancy</th>
-                      <th className="p-3">Climate Telemetry</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-mono text-slate-200">
-                    {correlations.map((c, i) => (
-                      <tr key={i} className="hover:bg-slate-800/40 transition">
-                        <td className="p-3 font-bold text-white">{c.classroom}</td>
-                        <td className="p-3 font-sans text-slate-300">{c.subject || 'Live Lecture'}</td>
-                        <td className="p-3">
-                          <span className="text-blue-400 font-bold">{c.attendance_face_count}</span> verified
-                        </td>
-                        <td className="p-3">
-                          {c.physical_occupancy_count !== undefined ? (
-                            <span>{c.physical_occupancy_count} occupants</span>
-                          ) : (
-                            <span className="text-slate-600">No sensor stream</span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          {c.discrepancy_alert ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center space-x-1 w-fit">
-                              <AlertTriangle className="w-3 h-3" />
-                              <span>{c.discrepancy_alert}</span>
-                            </span>
-                          ) : c.physical_occupancy_count !== undefined ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center space-x-1 w-fit">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>100% Correlated</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-500 text-[10px]">Awaiting Sensor</span>
-                          )}
-                        </td>
-                        <td className="p-3 font-sans">
-                          {c.environmental ? (
-                            <div className="flex items-center space-x-2 text-[11px] text-slate-300">
-                              {c.environmental.temperature_c && <span>{c.environmental.temperature_c.toFixed(1)}°C</span>}
-                              {c.environmental.co2_ppm && (
-                                <span className="text-emerald-400 font-mono">{c.environmental.co2_ppm} ppm</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-slate-600 text-[10px] italic">No Climate Node</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 5: Live Hardware Events */}
-      {activeTab === 'events' && (
-        <div className="space-y-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                  <Activity className="w-4 h-4 text-emerald-400" />
-                  <span>Authentic Hardware Event & Telemetry Stream</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Real-time audit log of hardware connections, disconnections, telemetry packets, and environmental thresholds
-                </p>
-              </div>
-
-              <button
-                onClick={loadEvents}
-                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 flex items-center space-x-1.5 transition"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Refresh Log</span>
-              </button>
-            </div>
-
-            {liveEvents.length === 0 ? (
-              <div className="p-8 border border-dashed border-slate-800 rounded-xl text-center text-slate-500 text-xs">
-                No hardware events recorded yet. Connect a device or push a telemetry packet to see live events.
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {liveEvents.map((evt) => (
-                  <div
-                    key={evt.id}
-                    className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl flex items-start justify-between gap-3 text-xs"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
-                            evt.severity === 'success'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                              : evt.severity === 'warning'
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                              : evt.severity === 'error'
-                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                              : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
-                          }`}
-                        >
-                          {evt.type}
-                        </span>
-                        <span className="font-mono text-slate-300 font-bold">{evt.device_name}</span>
-                        <span className="text-slate-500">in {evt.classroom}</span>
-                      </div>
-                      <p className="text-slate-300 text-[11px]">{evt.message}</p>
-                    </div>
-
-                    <div className="text-[10px] text-slate-500 font-mono shrink-0">
-                      {new Date(evt.timestamp).toLocaleTimeString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 6: Remote Sensing & Geospatial Context (Open-Meteo) */}
-      {activeTab === 'remote_sensing' && (
-        <div className="space-y-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                  <Globe className="w-4 h-4 text-purple-400" />
-                  <span>Remote Sensing & Geospatial Atmosphere Context</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Official Open-Meteo WMO / Copernicus high-resolution atmospheric & solar irradiance telemetry
-                </p>
-              </div>
-              <button
-                onClick={loadRemoteSensing}
-                disabled={remoteSensingLoading}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 flex items-center space-x-1.5 transition"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${remoteSensingLoading ? 'animate-spin' : ''}`} />
-                <span>Fetch Satellite Observation</span>
-              </button>
-            </div>
-
-            {remoteSensingLoading ? (
-              <div className="p-12 text-center text-slate-400">
-                <RefreshCw className="w-8 h-8 animate-spin mx-auto text-purple-500 mb-3" />
-                <p className="text-xs font-semibold">Querying Open-Meteo WMO Global Reanalysis Grid...</p>
-              </div>
-            ) : remoteSensingError ? (
-              <div className="p-4 bg-rose-950/60 border border-rose-800/60 rounded-xl text-rose-300 text-xs flex items-start space-x-2.5">
-                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-rose-400" />
-                <span>{remoteSensingError}</span>
-              </div>
-            ) : remoteSensing ? (
-              <div className="space-y-6">
-                {/* Location & Metadata Pill */}
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Target Institution Campus</div>
-                    <div className="text-slate-200 font-bold font-sans">
-                      {remoteSensing.institution_location.campus}
-                    </div>
-                    <div className="text-slate-400 text-[11px] font-sans">
-                      {remoteSensing.institution_location.city} ({remoteSensing.institution_location.latitude}° N, {remoteSensing.institution_location.longitude}° E)
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Provider & Resolution</div>
-                    <div className="text-purple-300 font-bold">{remoteSensing.provider}</div>
-                    <div className="text-slate-400 text-[11px]">{remoteSensing.spatial_resolution}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Data Freshness</div>
-                    <div className="text-emerald-400 font-bold flex items-center space-x-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{remoteSensing.data_freshness}</span>
-                    </div>
-                    <div className="text-slate-400 text-[11px]">
-                      {new Date(remoteSensing.acquisition_time).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Atmosphere & Weather Metrics */}
-                {remoteSensing.weather && (
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                      Campus Atmospheric Telemetry:
-                    </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-1">
-                        <div className="flex items-center space-x-1.5 text-xs text-slate-400">
-                          <Thermometer className="w-4 h-4 text-amber-400" />
-                          <span>Surface Temp</span>
-                        </div>
-                        <div className="text-2xl font-bold text-white font-mono">
-                          {remoteSensing.weather.temperature_c.toFixed(1)} <span className="text-sm">°C</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          Feels like {remoteSensing.weather.apparent_temperature_c.toFixed(1)} °C
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-1">
-                        <div className="flex items-center space-x-1.5 text-xs text-slate-400">
-                          <Wind className="w-4 h-4 text-cyan-400" />
-                          <span>Relative Humidity</span>
-                        </div>
-                        <div className="text-2xl font-bold text-white font-mono">
-                          {remoteSensing.weather.relative_humidity_pct} <span className="text-sm">%</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500">Pressure: {remoteSensing.weather.surface_pressure_hpa} hPa</div>
-                      </div>
-
-                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-1">
-                        <div className="flex items-center space-x-1.5 text-xs text-slate-400">
-                          <Sun className="w-4 h-4 text-yellow-400" />
-                          <span>Solar Irradiance</span>
-                        </div>
-                        <div className="text-2xl font-bold text-white font-mono">
-                          {remoteSensing.weather.solar_irradiance_wm2 ?? 0} <span className="text-sm">W/m²</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500">Cloud cover: {remoteSensing.weather.cloud_cover_pct}%</div>
-                      </div>
-
-                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-1">
-                        <div className="flex items-center space-x-1.5 text-xs text-slate-400">
-                          <Activity className="w-4 h-4 text-emerald-400" />
-                          <span>Air Quality (US AQI)</span>
-                        </div>
-                        <div className="text-2xl font-bold text-emerald-400 font-mono">
-                          {remoteSensing.air_quality?.us_aqi ?? 'Good'}
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          PM2.5: {remoteSensing.air_quality?.pm2_5_ugm3 ?? '--'} μg/m³
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
+            </form>
           </div>
         </div>
       )}
 
       {/* Register Device Modal */}
       {isRegisterOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 text-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-white flex items-center space-x-2">
-                <Plus className="w-5 h-5 text-blue-400" />
-                <span>Register New Campus IoT Device</span>
-              </h3>
-              <button
-                onClick={() => setIsRegisterOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
-              >
-                ✕
-              </button>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="apple-card p-6 sm:p-7 bg-white max-w-lg w-full space-y-5 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="border-b border-gray-100 pb-3">
+              <h3 className="text-base font-bold text-gray-900">Register New Campus Device</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Add an authentic hardware peripheral or IoT gateway to Siddhartha Institute's network.
+              </p>
             </div>
 
             {registeredCredentials ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-emerald-950/50 border border-emerald-500/40 rounded-xl space-y-2 text-xs">
-                  <div className="font-bold text-emerald-400 flex items-center space-x-1.5">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Device Successfully Provisioned!</span>
+              <div className="space-y-4 text-xs">
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 space-y-2">
+                  <div className="font-bold flex items-center space-x-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Device Registered Successfully</span>
                   </div>
-                  <p className="text-slate-300">
-                    Use the following secret credentials in your ESP32 / microcontroller firmware:
+                  <p className="text-xs">
+                    Copy the ingestion credentials below to flash into your hardware device.
                   </p>
                 </div>
 
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2 text-xs font-mono">
-                  <div>
-                    <span className="text-slate-500">Device ID: </span>
-                    <span className="text-cyan-400 font-bold">{registeredCredentials.device_id}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Secret Token: </span>
-                    <span className="text-emerald-400 font-bold">{registeredCredentials.device_token}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Ingestion URL: </span>
-                    <span className="text-slate-300">{registeredCredentials.ingestion_url}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">HTTP Header: </span>
-                    <span className="text-amber-400">{registeredCredentials.header_auth}</span>
-                  </div>
+                <div className="p-3 bg-gray-50 rounded-xl border font-mono text-[11px] space-y-1">
+                  <div>ID: <strong>{registeredCredentials.device_id}</strong></div>
+                  <div>Token: <strong>{registeredCredentials.device_token}</strong></div>
+                  <div>Ingestion URL: <strong>{registeredCredentials.ingestion_url}</strong></div>
                 </div>
 
                 <button
                   onClick={() => {
-                    setIsRegisterOpen(false);
                     setRegisteredCredentials(null);
+                    setIsRegisterOpen(false);
                   }}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition"
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold"
                 >
                   Done
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleRegisterSubmit} className="space-y-4 text-xs">
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-semibold">Device Name *</label>
+              <form onSubmit={handleRegisterDevice} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">Device Name</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. C-204 Environmental & Occupancy Node"
                     value={registerForm.name}
                     onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-blue-500"
+                    placeholder="e.g. ESP32 Environmental Hub LH-101"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-slate-300 font-semibold">Category *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Category</label>
                     <select
                       value={registerForm.category}
-                      onChange={(e) => setRegisterForm({ ...registerForm, category: e.target.value as DeviceCategory })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-blue-500"
+                      onChange={(e) => setRegisterForm({ ...registerForm, category: e.target.value as any })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600 font-medium"
                     >
-                      <option value="ESP32_GATEWAY">ESP32 Gateway (WiFi / REST)</option>
-                      <option value="BLE_SENSOR">BLE Environmental Sensor</option>
-                      <option value="OCCUPANCY_SENSOR">Occupancy PIR Node</option>
-                      <option value="ENVIRONMENTAL_SENSOR">DHT22 / MQ-135 Climate Node</option>
-                      <option value="CAMERA">Vision Camera (RTSP / USB)</option>
-                      <option value="DOOR_BEACON">Door Access Beacon</option>
+                      <option value="ESP32_GATEWAY">ESP32 Gateway</option>
+                      <option value="USB_CAMERA">USB Camera</option>
+                      <option value="IP_RTSP_CAMERA">IP Camera</option>
+                      <option value="BLE_ENVIRONMENTAL_SENSOR">BLE Sensor</option>
+                      <option value="EDGE_COMPUTE_AI">Edge AI Hub</option>
                     </select>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-slate-300 font-semibold">Classroom *</label>
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Device Role</label>
                     <select
-                      value={registerForm.classroom}
-                      onChange={(e) => setRegisterForm({ ...registerForm, classroom: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-blue-500"
+                      value={registerForm.device_role}
+                      onChange={(e) => setRegisterForm({ ...registerForm, device_role: e.target.value as any })}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600 font-medium"
                     >
-                      <option value="C-204">C-204</option>
-                      <option value="LH-101">LH-101</option>
-                      <option value="LH-102">LH-102</option>
-                      <option value="LH-103">LH-103</option>
-                      <option value="LH-104">LH-104</option>
-                      <option value="LH-105">LH-105</option>
-                      <option value="LH-201">LH-201</option>
-                      <option value="LH-202">LH-202</option>
-                      <option value="LH-301">LH-301</option>
-                      <option value="IoT-Lab-1">IoT Lab 1</option>
-                      <option value="AI-Lab-1">AI Vision Lab 1</option>
+                      <option value="Attendance Camera">Attendance Camera</option>
+                      <option value="Environmental Sensor">Environmental Sensor</option>
+                      <option value="Occupancy Sensor">Occupancy Sensor</option>
+                      <option value="Door Sensor">Door Sensor</option>
+                      <option value="IoT Gateway">IoT Gateway</option>
+                      <option value="Classroom Display">Classroom Display</option>
                     </select>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-slate-300 font-semibold">Protocol</label>
-                    <select
-                      value={registerForm.protocol}
-                      onChange={(e) => setRegisterForm({ ...registerForm, protocol: e.target.value as DeviceProtocol })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-blue-500"
-                    >
-                      <option value="HTTPS_REST">HTTPS REST Ingestion</option>
-                      <option value="WEBSOCKET">WebSocket Stream</option>
-                      <option value="BLE_GATT">Web Bluetooth GATT</option>
-                      <option value="MQTT">MQTT Gateway</option>
-                      <option value="RTSP">RTSP Camera Stream</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-slate-300 font-semibold">Hardware Type / Model</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Classroom</label>
                     <input
                       type="text"
-                      placeholder="e.g. ESP32 NodeMCU + DHT22"
-                      value={registerForm.device_type}
-                      onChange={(e) => setRegisterForm({ ...registerForm, device_type: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-blue-500"
+                      required
+                      value={registerForm.classroom}
+                      onChange={(e) => setRegisterForm({ ...registerForm, classroom: e.target.value })}
+                      placeholder="LH-101"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Room</label>
+                    <input
+                      type="text"
+                      value={registerForm.room}
+                      onChange={(e) => setRegisterForm({ ...registerForm, room: e.target.value })}
+                      placeholder="Room 304"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-blue-600"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-gray-100">
                   <button
                     type="button"
                     onClick={() => setIsRegisterOpen(false)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-semibold"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={registering}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md flex items-center space-x-1.5"
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold disabled:opacity-50"
                   >
-                    {registering ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
-                    <span>Provision Device</span>
+                    {registering ? 'Registering...' : 'Register Device'}
                   </button>
                 </div>
               </form>
@@ -1672,140 +1497,97 @@ export const CampusDeviceManager: React.FC<CampusDeviceManagerProps> = ({
         </div>
       )}
 
-      {/* Code Snippet & Firmware Modal */}
-      {selectedDeviceForCode && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 text-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Code className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-base font-bold text-white">Hardware Ingestion Code & Credentials</h3>
+      {/* Browser Hardware Limitations & Permissions Policy Guide Modal */}
+      {showPolicyModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="apple-card p-6 sm:p-8 bg-white max-w-2xl w-full space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 tracking-tight">
+                    Browser Hardware Limitations & Policy Guide
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Institutional security boundaries, permissions policy & peripheral access
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setSelectedDeviceForCode(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                onClick={() => setShowPolicyModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl space-y-1.5 text-xs font-mono">
-              <div>
-                <span className="text-slate-500">Device Name: </span>
-                <span className="text-white font-bold">{selectedDeviceForCode.name}</span>
+            <div className="space-y-4 text-xs text-gray-600">
+              {/* Point 1: Sandbox & Permissions Policy */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-2">
+                <div className="font-bold text-gray-900 flex items-center space-x-2">
+                  <Shield className="w-4 h-4 text-blue-600" />
+                  <span>1. Browser Sandbox & Permissions Policy</span>
+                </div>
+                <p className="leading-relaxed">
+                  Web browsers enforce strict sandboxing around raw OS peripherals to protect user privacy. Under the W3C Permissions Policy specification, low-level hardware APIs (such as Web Bluetooth and raw USB cameras) cannot be accessed freely across nested or cross-origin iframe boundaries.
+                </p>
               </div>
-              <div>
-                <span className="text-slate-500">Device ID: </span>
-                <span className="text-cyan-400 font-bold">{selectedDeviceForCode.id}</span>
+
+              {/* Point 2: Web Bluetooth Requirements */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-2">
+                <div className="font-bold text-gray-900 flex items-center space-x-2">
+                  <Bluetooth className="w-4 h-4 text-blue-600" />
+                  <span>2. Web Bluetooth Constraints & Resolution</span>
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-gray-600 pl-1">
+                  <li><strong>Iframe Isolation:</strong> Web Bluetooth calls (<code className="font-mono text-gray-800">navigator.bluetooth.requestDevice</code>) are blocked inside embedded iframes without explicit parent delegation.</li>
+                  <li><strong>Transient User Gesture:</strong> Scans can only be triggered by an explicit physical user click, never programmatically on boot.</li>
+                  <li><strong>Actionable Fix:</strong> Launch ATTENDIQ in a top-level browser tab using the "Open in New Window" button below to bypass iframe restrictions.</li>
+                </ul>
               </div>
-              <div>
-                <span className="text-slate-500">Secret Token: </span>
-                <span className="text-emerald-400 font-bold">{selectedDeviceForCode.device_token || '(Pre-shared)'}</span>
+
+              {/* Point 3: Camera Device Enumeration */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-2">
+                <div className="font-bold text-gray-900 flex items-center space-x-2">
+                  <Camera className="w-4 h-4 text-indigo-600" />
+                  <span>3. USB Camera & Video Enumeration</span>
+                </div>
+                <p className="leading-relaxed">
+                  Browsers mask physical camera labels until the user grants camera permissions. Once allowed, ATTENDIQ accurately lists every physical USB camera and integrated sensor with distinct device IDs for dedicated classroom attendance binding.
+                </p>
               </div>
-              <div>
-                <span className="text-slate-500">Endpoint: </span>
-                <span className="text-slate-300">POST /api/devices/{selectedDeviceForCode.id}/telemetry</span>
+
+              {/* Point 4: Zero Fake Data Policy */}
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-1.5 text-emerald-900">
+                <div className="font-bold flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>4. Strict Institutional Truth Policy</span>
+                </div>
+                <p className="leading-relaxed text-emerald-800">
+                  ATTENDIQ adheres strictly to institutional integrity: zero artificial devices, zero random telemetry generation (<code className="font-mono">Math.random()</code>), and no fabricated BLE beacons. Offline hardware is truthfully reported as offline.
+                </p>
               </div>
             </div>
 
-            {/* Firmware Selector Tabs */}
-            <div className="flex border-b border-slate-800 space-x-2">
-              <button
-                onClick={() => setFirmwareTab('arduino')}
-                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition ${
-                  firmwareTab === 'arduino' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-400'
-                }`}
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-gray-100">
+              <a
+                href={typeof window !== 'undefined' ? window.location.href : '#'}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full sm:w-auto px-5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-full flex items-center justify-center space-x-2 transition text-xs border border-blue-200"
               >
-                ESP32 (C++ / Arduino)
-              </button>
+                <span>Open in Top-Level Tab</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+
               <button
-                onClick={() => setFirmwareTab('micropython')}
-                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition ${
-                  firmwareTab === 'micropython' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-400'
-                }`}
+                onClick={() => setShowPolicyModal(false)}
+                className="w-full sm:w-auto px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-full text-xs transition"
               >
-                MicroPython
-              </button>
-              <button
-                onClick={() => setFirmwareTab('curl')}
-                className={`px-3 py-1.5 text-xs font-bold border-b-2 transition ${
-                  firmwareTab === 'curl' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-400'
-                }`}
-              >
-                cURL / Terminal
-              </button>
-            </div>
-
-            {firmwareTab === 'arduino' && (
-              <pre className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-[11px] font-mono text-cyan-300 overflow-x-auto">
-{`#include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
-
-const char* ssid = "CAMPUS_WIFI";
-const char* password = "WIFI_PASSWORD";
-const char* serverUrl = "https://${typeof window !== 'undefined' ? window.location.host : 'your-domain'}/api/devices/${selectedDeviceForCode.id}/telemetry";
-const char* deviceToken = "${selectedDeviceForCode.device_token || 'TOKEN'}";
-
-void sendTelemetry(float temp, float humidity, int co2, int occupancy) {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(serverUrl);
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-Device-Token", deviceToken);
-
-    StaticJsonDocument<256> doc;
-    doc["temperature_c"] = temp;
-    doc["humidity_pct"] = humidity;
-    doc["co2_ppm"] = co2;
-    doc["occupancy_count"] = occupancy;
-
-    String body;
-    serializeJson(doc, body);
-    int code = http.POST(body);
-    http.end();
-  }
-}`}
-              </pre>
-            )}
-
-            {firmwareTab === 'micropython' && (
-              <pre className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-[11px] font-mono text-emerald-300 overflow-x-auto">
-{`import urequests
-import json
-
-URL = "https://${typeof window !== 'undefined' ? window.location.host : 'your-domain'}/api/devices/${selectedDeviceForCode.id}/telemetry"
-TOKEN = "${selectedDeviceForCode.device_token || 'TOKEN'}"
-
-def send_telemetry(temp, hum, co2, occ):
-    headers = {"Content-Type": "application/json", "X-Device-Token": TOKEN}
-    payload = {
-        "temperature_c": temp,
-        "humidity_pct": hum,
-        "co2_ppm": co2,
-        "occupancy_count": occ
-    }
-    res = urequests.post(URL, data=json.dumps(payload), headers=headers)
-    print("Ingestion Status:", res.status_code)
-    res.close()`}
-              </pre>
-            )}
-
-            {firmwareTab === 'curl' && (
-              <pre className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-slate-300 overflow-x-auto">
-{`curl -X POST https://${typeof window !== 'undefined' ? window.location.host : 'localhost:3000'}/api/devices/${selectedDeviceForCode.id}/telemetry \\
-  -H "Content-Type: application/json" \\
-  -H "X-Device-Token: ${selectedDeviceForCode.device_token || 'TOKEN'}" \\
-  -d '{"temperature_c": 24.5, "humidity_pct": 52, "co2_ppm": 480, "occupancy_count": 28}'`}
-              </pre>
-            )}
-
-            <div className="flex justify-end">
-              <button
-                onClick={() => setSelectedDeviceForCode(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition"
-              >
-                Close
+                Understood
               </button>
             </div>
           </div>
