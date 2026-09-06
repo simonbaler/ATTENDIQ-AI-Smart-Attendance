@@ -14,8 +14,10 @@ import validationRouter from './server/routes/validation.js';
 import mobileRouter from './server/routes/mobile.js';
 import camerasRouter from './server/routes/cameras.js';
 import devicesRouter from './server/routes/devices.js';
+import securityRouter from './server/routes/security.js';
 import { createSignalingServer } from './server/signaling.js';
 import { createIoTGatewayServer } from './server/iotGateway.js';
+import { cyberDefenseMiddleware, CyberDefense } from './server/securityGuard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +37,18 @@ async function startServer() {
   // Dispatch HTTP upgrade events based on URL path
   server.on('upgrade', (request, socket, head) => {
     const { pathname } = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+
+    // Check if client IP is quarantined
+    const clientIp = (request.headers['cf-connecting-ip'] as string) ||
+      (request.headers['x-real-ip'] as string) ||
+      ((request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()) ||
+      request.socket?.remoteAddress || '127.0.0.1';
+    
+    if (CyberDefense.isJailed(clientIp)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
 
     if (pathname.startsWith('/api/mobile/signaling')) {
       signalingWss.handleUpgrade(request, socket, head, (ws) => {
@@ -71,6 +85,9 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+  // Cyber Defense & Threat Interception Guard (inspects payloads, blocks attacks, auto-jails IPs)
+  app.use(cyberDefenseMiddleware);
+
   // Static storage for captured student photos
   app.use('/data/students', express.static(path.join(process.cwd(), 'data', 'students')));
 
@@ -82,12 +99,14 @@ async function startServer() {
       institution: 'Siddhartha Institute of Technology and Sciences',
       public_origin: process.env.APP_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 'https://ais-pre-bpayzufx5syjwygztm4y7l-460380840568.asia-southeast1.run.app',
       version: '2.0.0',
+      cyber_shield: 'ACTIVE_PREVENTION',
       timestamp: new Date().toISOString(),
     });
   });
 
   // API Routes
   app.use('/api/auth', authRouter);
+  app.use('/api/security', securityRouter);
   app.use('/api/students', studentsRouter);
   app.use('/api/sessions', sessionsRouter);
   app.use('/api/attendance', attendanceRouter);

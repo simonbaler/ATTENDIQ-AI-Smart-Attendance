@@ -281,7 +281,7 @@ router.post('/', authenticateToken, (req, res) => {
       }
 
       const newMultiSession: AttendanceSession = {
-        id: `ses_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        id: `ses_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
         department: selectedDepts.join(' + '),
         section: 'MULTI',
         subject: subject.trim(),
@@ -351,7 +351,7 @@ router.post('/', authenticateToken, (req, res) => {
     });
 
     const newSession: AttendanceSession = {
-      id: `ses_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `ses_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
       department: department.trim(),
       section: section.trim().toUpperCase(),
       subject: subject.trim(),

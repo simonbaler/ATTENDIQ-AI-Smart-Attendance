@@ -240,6 +240,18 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     } else if (lower.includes('system health') || lower.includes('diagnostics') || lower.includes('settings')) {
       onNavigateTab?.('system');
       reply = 'Opening System Hardening and Hardware Diagnostics panel.';
+    } else if (lower.includes('cyber defense') || lower.includes('security') || lower.includes('threats') || lower.includes('hack') || lower.includes('intrusion')) {
+      onNavigateTab?.('security');
+      try {
+        const secRes = await api.getSecurityStats();
+        if (secRes.success) {
+          reply = `Cyber Defense Shield is active and enforcing zero-trust. Intercepted ${secRes.stats.total} intrusion attempts, with ${secRes.stats.jailed_ips_count} attacker IPs currently quarantined in jail. Navigating to Cyber Defense Center.`;
+        } else {
+          reply = 'Opening Cyber Defense Center. Zero intrusions permitted.';
+        }
+      } catch (e) {
+        reply = 'Opening Cyber Defense Center. Active perimeter defense is online.';
+      }
     } else {
       reply = `Understood: "${cmd}". You can command ATTENDIQ to start attendance, pair mobile, query present or absent counts, show department attendance, or export records.`;
     }

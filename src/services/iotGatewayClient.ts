@@ -21,6 +21,7 @@ type StatusListener = (event: IoTStatusEvent) => void;
 type DeviceEventListener = (event: DeviceEventLog) => void;
 type StateListener = (state: IoTGatewayConnectionState) => void;
 type BeaconListener = (data: { gatewayId: string; classroom: string; beacons: any[]; timestamp: string }) => void;
+type SecurityAlertListener = (event: import('../types').SecurityEvent) => void;
 
 class IoTGatewayClient {
   private ws: WebSocket | null = null;
@@ -37,6 +38,7 @@ class IoTGatewayClient {
   private eventListeners: Set<DeviceEventListener> = new Set();
   private stateListeners: Set<StateListener> = new Set();
   private beaconListeners: Set<BeaconListener> = new Set();
+  private securityAlertListeners: Set<SecurityAlertListener> = new Set();
 
   private filter: { classroom?: string; department?: string } = {
     classroom: 'ALL',
@@ -152,9 +154,18 @@ class IoTGatewayClient {
     return () => this.stateListeners.delete(cb);
   }
 
+  public onStateChange(cb: StateListener): () => void {
+    return this.onState(cb);
+  }
+
   public onBeacons(cb: BeaconListener): () => void {
     this.beaconListeners.add(cb);
     return () => this.beaconListeners.delete(cb);
+  }
+
+  public onSecurityAlert(cb: SecurityAlertListener): () => void {
+    this.securityAlertListeners.add(cb);
+    return () => this.securityAlertListeners.delete(cb);
   }
 
   private handleMessage(data: any) {
@@ -219,6 +230,19 @@ class IoTGatewayClient {
             });
           } catch (e) {
             console.error('[IoT Gateway Client] Error in beacon listener:', e);
+          }
+        }
+        break;
+      }
+
+      case 'SECURITY_ALERT': {
+        if (data.event) {
+          for (const listener of this.securityAlertListeners) {
+            try {
+              listener(data.event);
+            } catch (e) {
+              console.error('[IoT Gateway Client] Error in security alert listener:', e);
+            }
           }
         }
         break;

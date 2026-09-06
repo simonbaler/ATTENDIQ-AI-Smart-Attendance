@@ -447,6 +447,37 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
         </div>
       </div>
 
+      {/* Real Cyber Defense & Intrusion Shield Posture Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white border border-slate-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="p-3 bg-blue-500/20 rounded-xl border border-blue-400/30 text-blue-400 shrink-0">
+            <ShieldAlert className="w-6 h-6 animate-pulse" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-bold text-sm text-white">
+                Institutional Cyber Defense & Anti-Hack Shield
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                ACTIVE ZERO-TRUST
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Deep payload inspection (SQLi, XSS, RCE, Path Traversal), automated IP quarantine jail, and real-time intruder geolocation tracking.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-3 shrink-0">
+          <button
+            onClick={() => onNavigate('security')}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/30 flex items-center space-x-1.5 transition"
+          >
+            <span>Open Cyber Defense Center</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
       {/* Real-Time Department Attendance Dashboard & Intelligence */}
       <div className="apple-card p-6 bg-white space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-gray-100">

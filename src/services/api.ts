@@ -463,14 +463,101 @@ export const api = {
     department?: string;
     severity?: string;
     event_type?: string;
+    limit?: number;
   }): Promise<{ success: boolean; count: number; events: import('../types').SecurityEvent[] }> {
     const query = new URLSearchParams();
     if (params?.department) query.append('department', params.department);
     if (params?.severity) query.append('severity', params.severity);
     if (params?.event_type) query.append('event_type', params.event_type);
+    if (params?.limit) query.append('limit', String(params.limit));
 
-    const res = await fetch(`${API_BASE}/security/events?${query.toString()}`, {
+    const res = await fetch(`${API_BASE}/security/threats?${query.toString()}`, {
       headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getSecurityStats(): Promise<{
+    success: boolean;
+    stats: {
+      total: number;
+      critical: number;
+      high: number;
+      blocked: number;
+      jailed_ips_count: number;
+      defense_shield_active: boolean;
+      firewall_mode: string;
+      topVectors: Record<string, number>;
+      topCountries: Record<string, number>;
+      ips_jailed: any[];
+    };
+  }> {
+    const res = await fetch(`${API_BASE}/security/stats`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getJailedIps(): Promise<{ success: boolean; count: number; jailed_ips: any[] }> {
+    const res = await fetch(`${API_BASE}/security/jailed-ips`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async jailIp(payload: { ip: string; reason?: string; duration_minutes?: number }): Promise<{ success: boolean; message: string; record: any }> {
+    const res = await fetch(`${API_BASE}/security/jailed-ips`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+
+  async unjailIp(ip: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/security/jailed-ips/${encodeURIComponent(ip)}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async clearSecurityLogs(): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/security/clear-logs`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async runSecurityTestCase(testType: 'SQLI' | 'XSS' | 'PATH_TRAVERSAL' | 'COMMAND_INJECTION' | 'EXPLOIT_SCANNER' | 'TOKEN_TAMPERING' | 'BRUTE_FORCE'): Promise<{
+    success: boolean;
+    blocked: boolean;
+    http_status_enforced: number;
+    shield_action: string;
+    test_result: {
+      test_type: string;
+      vector_detected: string;
+      sample_payload: string;
+      attacker_ip: string;
+      location: {
+        city: string;
+        country: string;
+        country_code: string;
+        isp: string;
+        flag: string;
+        coordinates: [number, number];
+      };
+      event_id: string;
+      timestamp: string;
+      realtime_alert_broadcasted: boolean;
+    };
+    message: string;
+  }> {
+    const res = await fetch(`${API_BASE}/security/test-case`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ test_type: testType }),
     });
     return res.json();
   },

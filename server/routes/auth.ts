@@ -253,7 +253,7 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
     const password_hash = await bcrypt.hash(password, salt);
 
     const newUser: User = {
-      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `usr_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
       username: username.toLowerCase().trim(),
       password_hash,
       role: role === 'ADMIN' ? 'ADMIN' : 'HOD',

@@ -48,18 +48,18 @@ export const VisionSphere3D: React.FC<{ className?: string }> = ({ className = '
     const innerMesh = new THREE.Mesh(innerGeo, innerMat);
     group.add(innerMesh);
 
-    // 3. Biometric Feature Points (Particles on sphere surface)
+    // 3. Biometric Feature Points (Fibonacci lattice on sphere surface - deterministic, no Math.random)
     const particleCount = 280;
     const particleGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
+    const goldenRatio = (1 + Math.sqrt(5)) / 2;
 
     for (let i = 0; i < particleCount; i++) {
-      const u = Math.random();
-      const v = Math.random();
-      const theta = u * 2.0 * Math.PI;
-      const phi = Math.acos(2.0 * v - 1.0);
-      const r = 1.42 + (Math.random() - 0.5) * 0.18;
+      const theta = 2 * Math.PI * i / goldenRatio;
+      const phi = Math.acos(1 - 2 * (i + 0.5) / particleCount);
+      // Subtle radial harmonics based on index
+      const r = 1.42 + Math.sin(i * 0.35) * 0.09;
 
       const x = r * Math.sin(phi) * Math.cos(theta);
       const y = r * Math.sin(phi) * Math.sin(theta);
@@ -70,12 +70,12 @@ export const VisionSphere3D: React.FC<{ className?: string }> = ({ className = '
       positions[i * 3 + 2] = z;
 
       // Color variation: royal blue, deep indigo, and emerald for contrast against light surface
-      const rand = Math.random();
-      if (rand > 0.6) {
+      const colorMod = i % 3;
+      if (colorMod === 0) {
         colors[i * 3] = 0.08; // Blue
         colors[i * 3 + 1] = 0.38;
         colors[i * 3 + 2] = 0.92;
-      } else if (rand > 0.3) {
+      } else if (colorMod === 1) {
         colors[i * 3] = 0.28; // Indigo
         colors[i * 3 + 1] = 0.22;
         colors[i * 3 + 2] = 0.88;

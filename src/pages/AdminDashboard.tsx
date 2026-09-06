@@ -15,11 +15,24 @@ import { StudentFormModal } from '../components/StudentFormModal';
 import { VoiceAssistant } from '../components/VoiceAssistant';
 import { DepartmentInfo, AttendanceSession } from '../types';
 import { api } from '../services/api';
+import { CameraSourceManager } from '../components/CameraSourceManager';
+import { CyberDefenseView } from '../components/CyberDefenseView';
+import { hardwareDiscovery, HardwareCameraDevice } from '../services/hardwareDiscovery';
 
 export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [departments, setDepartments] = useState<DepartmentInfo[]>([]);
   const [activeSession, setActiveSession] = useState<AttendanceSession | null>(null);
+  const [discoveredCameras, setDiscoveredCameras] = useState<HardwareCameraDevice[]>([]);
+  const [activeAttendanceCameraId, setActiveAttendanceCameraId] = useState<string>(
+    hardwareDiscovery.getActiveAttendanceCamera() || 'default'
+  );
+
+  useEffect(() => {
+    hardwareDiscovery.discoverCameras().then((res) => {
+      setDiscoveredCameras(res.cameras);
+    });
+  }, []);
 
   // Quick modals triggered from anywhere
   const [showSessionModal, setShowSessionModal] = useState(false);
@@ -80,9 +93,30 @@ export const AdminDashboard: React.FC = () => {
           />
         )}
 
+        {activeTab === 'departments' && (
+          <SessionsView
+            departments={departments}
+            onOpenLiveCamera={() => setActiveTab('live-camera')}
+          />
+        )}
+
         {activeTab === 'devices' && <CampusDeviceManager userRole="ADMIN" />}
 
+        {activeTab === 'cameras' && (
+          <CameraSourceManager
+            discoveredCameras={discoveredCameras}
+            activeAttendanceCameraId={activeAttendanceCameraId}
+            onSelectAttendanceCamera={(cam) => {
+              hardwareDiscovery.setActiveAttendanceCamera(cam.deviceId);
+              setActiveAttendanceCameraId(cam.deviceId);
+            }}
+            onOpenLiveCameraView={() => setActiveTab('live-camera')}
+          />
+        )}
+
         {activeTab === 'intelligence' && <IntelligenceView departments={departments} />}
+
+        {activeTab === 'security' && <CyberDefenseView />}
 
         {activeTab === 'students' && <StudentDirectory departments={departments} />}
 
@@ -131,6 +165,7 @@ export const AdminDashboard: React.FC = () => {
           else if (tab === 'students') setActiveTab('students');
           else if (tab === 'devices') setActiveTab('devices');
           else if (tab === 'intelligence') setActiveTab('intelligence');
+          else if (tab === 'security') setActiveTab('security');
           else if (tab === 'system') setActiveTab('settings');
         }}
       />

@@ -346,16 +346,16 @@ export class BiometricVectorIndex {
     const latencies: number[] = [];
     const testQuery = new Float32Array(128);
     for (let i = 0; i < 128; i++) {
-      testQuery[i] = (Math.random() - 0.5) * 2;
+      testQuery[i] = Math.sin((i + 1) * 0.43);
     }
     const normalizedQuery = this.l2Normalize(Array.from(testQuery));
 
-    // Synthesize in-memory Float32Array pool of 10,000 vectors
+    // Synthesize in-memory Float32Array pool of 10,000 vectors for latency benchmark
     const syntheticVectors: Float32Array[] = [];
     for (let i = 0; i < targetCount; i++) {
       const raw = new Float32Array(128);
       for (let d = 0; d < 128; d++) {
-        raw[d] = (Math.random() - 0.5) * 2;
+        raw[d] = Math.cos((i + 7) * (d + 3) * 0.17);
       }
       syntheticVectors.push(this.l2Normalize(Array.from(raw)));
     }

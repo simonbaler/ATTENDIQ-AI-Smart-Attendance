@@ -408,7 +408,7 @@ router.post('/process-recognition', authenticateToken, (req, res) => {
             // Mark attendance transactionally
             const now = new Date();
             const newRecord: AttendanceRecord = {
-              id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              id: `att_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
               student_id: match.student.id,
               roll_number: match.student.roll_number,
               full_name: match.student.full_name,

@@ -1,1 +1,47 @@
-[]
+[
+  {
+    "id": "sec_1788711976636_7b6ac902",
+    "timestamp": "2026-09-06T16:26:16.636Z",
+    "event_type": "SQLI_PROBE",
+    "severity": "CRITICAL",
+    "details": "[INTRUSION BLOCKED] Malicious SQLI_PROBE pattern in query params on GET /api/students. Target: ' OR 1=1 --",
+    "ip_address": "127.0.0.1",
+    "location": {
+      "city": "Hyderabad",
+      "region": "Telangana",
+      "country": "India",
+      "country_code": "IN",
+      "isp": "Siddhartha Institute Campus Intranet (SITS)",
+      "latitude": 17.385,
+      "longitude": 78.4867,
+      "flag": "🇮🇳"
+    },
+    "user_agent": "curl/7.88.1",
+    "target_endpoint": "GET /api/students",
+    "attack_payload": "' OR 1=1 --",
+    "blocked": true,
+    "jail_status": "JAILED"
+  },
+  {
+    "id": "sec_1788711976637_ef99ea0e",
+    "timestamp": "2026-09-06T16:26:16.637Z",
+    "event_type": "IP_JAILED",
+    "severity": "CRITICAL",
+    "details": "[SHIELD ACTION] Quarantined IP 127.0.0.1 (Hyderabad, India) for 30m. Reason: Active SQLI_PROBE attack in query parameter. Total attempts: 1.",
+    "ip_address": "127.0.0.1",
+    "location": {
+      "city": "Hyderabad",
+      "region": "Telangana",
+      "country": "India",
+      "country_code": "IN",
+      "isp": "Siddhartha Institute Campus Intranet (SITS)",
+      "latitude": 17.385,
+      "longitude": 78.4867,
+      "flag": "🇮🇳"
+    },
+    "user_agent": "curl/7.88.1",
+    "attack_payload": "SQLI_PROBE",
+    "blocked": true,
+    "jail_status": "JAILED"
+  }
+]

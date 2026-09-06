@@ -394,24 +394,52 @@ export interface AttendanceAnomaly {
   resolved_by?: string | null;
 }
 
+export type SecurityEventType =
+  | 'SPOOF_ATTEMPT'
+  | 'MULTIPLE_FACE_ENROLLMENT'
+  | 'UNAUTHORIZED_ACCESS'
+  | 'REPEATED_FAILED_LOGIN'
+  | 'UNUSUAL_RECOGNITION'
+  | 'ATTENDANCE_OVERRIDE'
+  | 'FACE_DATABASE_CHANGE'
+  | 'INTRUSION_ATTEMPT'
+  | 'SQLI_PROBE'
+  | 'XSS_INJECTION'
+  | 'PATH_TRAVERSAL'
+  | 'COMMAND_INJECTION'
+  | 'EXPLOIT_SCANNER'
+  | 'BRUTE_FORCE'
+  | 'TOKEN_TAMPERING'
+  | 'IP_JAILED';
+
+export interface SecurityEventLocation {
+  city?: string;
+  region?: string;
+  country?: string;
+  country_code?: string;
+  isp?: string;
+  latitude?: number;
+  longitude?: number;
+  flag?: string;
+}
+
 export interface SecurityEvent {
   id: string;
   session_id?: string;
   student_id?: string;
   student_name?: string;
   department?: string;
-  event_type:
-    | 'SPOOF_ATTEMPT'
-    | 'MULTIPLE_FACE_ENROLLMENT'
-    | 'UNAUTHORIZED_ACCESS'
-    | 'REPEATED_FAILED_LOGIN'
-    | 'UNUSUAL_RECOGNITION'
-    | 'ATTENDANCE_OVERRIDE'
-    | 'FACE_DATABASE_CHANGE';
+  event_type: SecurityEventType;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   details: string;
   timestamp: string;
   ip_address?: string;
+  location?: SecurityEventLocation;
+  user_agent?: string;
+  target_endpoint?: string;
+  attack_payload?: string;
+  blocked?: boolean;
+  jail_status?: 'JAILED' | 'WATCHED' | 'RELEASED' | 'BLOCKED';
 }
 
 export interface RecognitionEvent {
@@ -958,7 +986,7 @@ export const db = {
   logAudit: (log: Omit<AuditLog, 'id' | 'timestamp'>): void => {
     const logs = readJsonFile<AuditLog[]>(AUDIT_FILE, []);
     const newLog: AuditLog = {
-      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: `log_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
       timestamp: new Date().toISOString(),
       ...log,
     };
@@ -1221,13 +1249,57 @@ export const db = {
   logSecurityEvent: (event: Omit<SecurityEvent, 'id' | 'timestamp'>): SecurityEvent => {
     const events = readJsonFile<SecurityEvent[]>(SECURITY_EVENTS_FILE, []);
     const newEvent: SecurityEvent = {
-      id: `sec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: `sec_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
       timestamp: new Date().toISOString(),
       ...event,
     };
     events.push(newEvent);
+    // Keep max 1000 events to prevent unbounded growth
+    if (events.length > 1000) {
+      events.splice(0, events.length - 1000);
+    }
     writeJsonFile(SECURITY_EVENTS_FILE, events);
     return newEvent;
+  },
+  deleteSecurityEvent: (id: string): boolean => {
+    let events = readJsonFile<SecurityEvent[]>(SECURITY_EVENTS_FILE, []);
+    const initial = events.length;
+    events = events.filter((e) => e.id !== id);
+    if (events.length !== initial) {
+      writeJsonFile(SECURITY_EVENTS_FILE, events);
+      return true;
+    }
+    return false;
+  },
+  clearSecurityEvents: (): void => {
+    writeJsonFile(SECURITY_EVENTS_FILE, []);
+  },
+  getSecurityStats: () => {
+    const events = readJsonFile<SecurityEvent[]>(SECURITY_EVENTS_FILE, []);
+    const total = events.length;
+    const critical = events.filter((e) => e.severity === 'CRITICAL').length;
+    const high = events.filter((e) => e.severity === 'HIGH').length;
+    const blocked = events.filter((e) => e.blocked !== false).length;
+
+    const topVectors: Record<string, number> = {};
+    const topCountries: Record<string, number> = {};
+
+    for (const ev of events) {
+      const vec = ev.event_type || 'UNKNOWN';
+      topVectors[vec] = (topVectors[vec] || 0) + 1;
+
+      const ctry = ev.location?.country || 'Local Intranet';
+      topCountries[ctry] = (topCountries[ctry] || 0) + 1;
+    }
+
+    return {
+      total,
+      critical,
+      high,
+      blocked,
+      topVectors,
+      topCountries,
+    };
   },
 
   // Phase 3: Recognition Events
@@ -1237,7 +1309,7 @@ export const db = {
   logRecognitionEvent: (event: Omit<RecognitionEvent, 'id' | 'timestamp'>): void => {
     const events = readJsonFile<RecognitionEvent[]>(RECOGNITION_EVENTS_FILE, []);
     const newEvent: RecognitionEvent = {
-      id: `rec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `rec_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
       timestamp: new Date().toISOString(),
       ...event,
     };
@@ -1750,7 +1822,7 @@ export const db = {
     });
 
     const benchmarkResult = {
-      id: `bmk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `bmk_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
       timestamp: new Date().toISOString(),
       total_students_evaluated: students.length,
       total_enrolled_faces: totalEnrolledFaces,
@@ -2190,14 +2262,14 @@ export const db = {
     const existingIdx = sessions.findIndex((s) => s.attendance_session_id === attendanceSessionId);
     
     // Generate cryptographically random opaque token
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
+    const randomDigits = 1000 + (crypto.randomBytes(2).readUInt16BE(0) % 9000);
     const pairingCode = `SITS-${randomDigits}`;
     const pairingToken = `tok_${Date.now()}_${crypto.randomBytes(32).toString('hex')}`;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes TTL strictly per Phase 9 spec
 
     const newMobSession: MobileCameraSession = {
-      id: `mob_cam_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `mob_cam_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
       attendance_session_id: attendanceSessionId,
       pairing_code: pairingCode,
       pairing_token: pairingToken,

@@ -9,6 +9,7 @@ import { CampusDeviceManager } from '../components/CampusDeviceManager';
 import { SessionModal } from '../components/SessionModal';
 import { StudentFormModal } from '../components/StudentFormModal';
 import { VoiceAssistant } from '../components/VoiceAssistant';
+import { CyberDefenseView } from '../components/CyberDefenseView';
 import { DepartmentInfo, AttendanceSession } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -86,6 +87,8 @@ export const HodDashboard: React.FC = () => {
         {activeTab === 'devices' && <CampusDeviceManager userRole="HOD" userDepartment={user?.department} />}
 
         {activeTab === 'intelligence' && <IntelligenceView departments={departments} />}
+
+        {activeTab === 'security' && <CyberDefenseView />}
 
         {activeTab === 'students' && <StudentDirectory departments={departments} />}
 

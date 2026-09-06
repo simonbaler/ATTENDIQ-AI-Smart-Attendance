@@ -266,7 +266,7 @@ router.post('/', authenticateToken, (req, res) => {
     }
 
     const newStudent: Student = {
-      id: `std_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `std_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
       student_id: `SITS-${department.substring(0, 3).toUpperCase()}-${roll_number.trim().toUpperCase()}`,
       full_name: full_name.trim(),
       roll_number: roll_number.trim().toUpperCase(),
@@ -609,7 +609,7 @@ router.post(['/sync-google-sheet', '/sync-google-sheets'], authenticateToken, as
       embeddingReady++;
 
       const studentObj: Student = {
-        id: existing ? existing.id : `stu_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        id: existing ? existing.id : `stu_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
         student_id: existing?.student_id || `SITS-${dept.slice(0, 3).toUpperCase()}-${roll.slice(-4)}`,
         full_name: name,
         roll_number: roll,
@@ -716,7 +716,7 @@ router.post('/bulk-import', authenticateToken, (req, res) => {
       updatedCount++;
     } else {
       const newStudent: Student = {
-        id: `stu_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        id: `stu_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
         student_id: row.student_id || `SITS-${dept}-${roll.slice(-4)}`,
         full_name: name,
         roll_number: roll,
@@ -774,24 +774,23 @@ router.post('/generate-synthetic-cohort', authenticateToken, (req, res) => {
   const sections = ['A', 'B', 'C', 'D'];
 
   let added = 0;
-  const startRoll = 1000 + Math.floor(Math.random() * 8000);
+  const startRoll = 1000 + (Date.now() % 7000);
 
   for (let i = 0; i < targetCount; i++) {
-    const fName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const lName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const fName = firstNames[i % firstNames.length];
+    const lName = lastNames[(i * 3) % lastNames.length];
     const roll = `22SITS${department.slice(0, 3).toUpperCase()}${String(startRoll + i).padStart(4, '0')}`;
     const section = sections[i % sections.length];
 
     if (db.getStudentByRollNumber(roll)) continue;
 
-
-    // Generate valid normalized synthetic 128-D descriptor
+    // Generate valid normalized 128-D descriptor deterministically
     const encodings: number[][] = [];
     if (generateEncodings) {
       const vec: number[] = [];
       let sumSq = 0;
       for (let d = 0; d < 128; d++) {
-        const val = (Math.random() - 0.5) * 2;
+        const val = Math.sin((i + 1) * (d + 1) * 0.7);
         vec.push(val);
         sumSq += val * val;
       }

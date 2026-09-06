@@ -4,9 +4,9 @@
  * NO simulated devices, NO Math.random() ranges, NO fake telemetry.
  */
 
-import { HardwareCameraDevice, DiscoveredBluetoothDevice, ClassroomAssignment } from '../types';
+import { HardwareCameraDevice, DiscoveredBluetoothDevice, ClassroomAssignment, DiscoveredUsbDevice, WebUsbCapabilityState } from '../types';
 
-export type { HardwareCameraDevice, DiscoveredBluetoothDevice, ClassroomAssignment };
+export type { HardwareCameraDevice, DiscoveredBluetoothDevice, ClassroomAssignment, DiscoveredUsbDevice, WebUsbCapabilityState };
 
 export interface NetworkConnectionInfo {
   isOnline: boolean;
@@ -348,7 +348,10 @@ export class HardwareDiscoveryService {
         };
       }
 
-      const exactName = device.name || 'Unnamed Bluetooth Peripheral';
+      const exactName =
+        device.name && device.name.trim()
+          ? device.name.trim()
+          : 'Bluetooth device — name unavailable';
       const deviceType = this.classifyBluetoothType(exactName);
 
       const discovered: DiscoveredBluetoothDevice = {
@@ -524,6 +527,132 @@ export class HardwareDiscoveryService {
 
   public getDiscoveredBluetoothDevices(): DiscoveredBluetoothDevice[] {
     return Array.from(this.discoveredBluetoothDevices.values());
+  }
+
+  // =========================================================================
+  // 3. REAL WEBUSB PERIPHERAL ENUMERATION & INSPECTION
+  // =========================================================================
+
+  private discoveredUsbDevices: Map<string, DiscoveredUsbDevice> = new Map();
+
+  /**
+   * Determine WebUSB support in current browser and iframe context
+   */
+  public getUsbCapabilityState(): WebUsbCapabilityState {
+    if (typeof navigator === 'undefined' || !('usb' in navigator)) {
+      return 'UNSUPPORTED';
+    }
+    try {
+      if (window.self !== window.top) {
+        // Embedded iframe - check if permissions policy delegates usb
+        return 'BLOCKED_BY_IFRAME';
+      }
+    } catch {
+      return 'BLOCKED_BY_IFRAME';
+    }
+    return 'SUPPORTED';
+  }
+
+  /**
+   * Enumerate already-paired USB devices
+   */
+  public async getPairedUsbDevices(): Promise<DiscoveredUsbDevice[]> {
+    if (typeof navigator === 'undefined' || !('usb' in navigator)) {
+      return [];
+    }
+    try {
+      const devices = await (navigator as any).usb.getDevices();
+      const list: DiscoveredUsbDevice[] = devices.map((d: any) => ({
+        device: d,
+        vendorId: d.vendorId,
+        productId: d.productId,
+        productName: d.productName || `USB Device [0x${d.vendorId.toString(16).padStart(4, '0')}:0x${d.productId.toString(16).padStart(4, '0')}]`,
+        manufacturerName: d.manufacturerName || 'Unknown Manufacturer',
+        serialNumber: d.serialNumber || undefined,
+        opened: d.opened || false,
+      }));
+      list.forEach((dev) => {
+        this.discoveredUsbDevices.set(`${dev.vendorId}_${dev.productId}`, dev);
+      });
+      return list;
+    } catch (err) {
+      console.warn('[WebUSB getDevices]', err);
+      return [];
+    }
+  }
+
+  /**
+   * Prompt user to pair a real physical USB peripheral via WebUSB
+   */
+  public async requestUsbDevice(): Promise<{
+    success: boolean;
+    device?: DiscoveredUsbDevice;
+    error?: string;
+    blockedReason?: 'PERMISSIONS_POLICY' | 'UNSUPPORTED' | 'NOT_ALLOWED' | 'NOT_FOUND' | 'UNKNOWN';
+  }> {
+    if (typeof navigator === 'undefined' || !('usb' in navigator)) {
+      return {
+        success: false,
+        error: 'WebUSB is not supported by this browser. Use Google Chrome, Microsoft Edge, or Opera on desktop.',
+        blockedReason: 'UNSUPPORTED',
+      };
+    }
+
+    try {
+      const d = await (navigator as any).usb.requestDevice({ filters: [] });
+      if (!d) {
+        return {
+          success: false,
+          error: 'No USB device was chosen.',
+          blockedReason: 'NOT_FOUND',
+        };
+      }
+
+      const dev: DiscoveredUsbDevice = {
+        device: d,
+        vendorId: d.vendorId,
+        productId: d.productId,
+        productName: d.productName || `USB Device [0x${d.vendorId.toString(16).padStart(4, '0')}:0x${d.productId.toString(16).padStart(4, '0')}]`,
+        manufacturerName: d.manufacturerName || 'Hardware Peripheral',
+        serialNumber: d.serialNumber || undefined,
+        opened: d.opened || false,
+      };
+
+      this.discoveredUsbDevices.set(`${dev.vendorId}_${dev.productId}`, dev);
+      return { success: true, device: dev };
+    } catch (err: any) {
+      const msg = err.message || String(err);
+      if (err.name === 'SecurityError' || msg.includes('Permissions Policy') || msg.includes('permissions policy')) {
+        return {
+          success: false,
+          error: 'WebUSB is blocked by the embedded preview permissions policy. Open ATTENDIQ in a new browser tab for direct USB hardware access.',
+          blockedReason: 'PERMISSIONS_POLICY',
+        };
+      }
+      if (err.name === 'NotFoundError') {
+        return {
+          success: false,
+          error: 'No USB device selected from the browser prompt.',
+          blockedReason: 'NOT_FOUND',
+        };
+      }
+      if (err.name === 'NotAllowedError') {
+        return {
+          success: false,
+          error: 'USB access prompt was cancelled or denied.',
+          blockedReason: 'NOT_ALLOWED',
+        };
+      }
+      return {
+        success: false,
+        error: `WebUSB error: ${msg}`,
+        blockedReason: 'UNKNOWN',
+      };
+    }
+  }
+
+  public getDiscoveredUsbDevices(): DiscoveredUsbDevice[] {
+    return Array.from(this.discoveredUsbDevices.values());
   }
 
   // =========================================================================

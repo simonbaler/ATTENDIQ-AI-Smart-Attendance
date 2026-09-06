@@ -403,7 +403,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
               if (fr.student && fr.status === 'RECOGNIZED') {
                 setRecentMarks((prev) => [
                   {
-                    id: `mark_${Date.now()}_${Math.random()}`,
+                    id: `mark_${Date.now()}_${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`,
                     name: fr.student!.full_name,
                     roll: fr.student!.roll_number,
                     time: new Date().toLocaleTimeString(),
@@ -628,7 +628,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                 if (fr.attendanceMarked && fr.student) {
                   setRecentMarks((prev) => [
                     {
-                      id: `mark_${Date.now()}_${Math.random()}`,
+                      id: `mark_${Date.now()}_${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`,
                       name: fr.student.full_name,
                       roll: fr.student.roll_number,
                       time: new Date().toLocaleTimeString(),
@@ -737,7 +737,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
                 if (fr.attendanceMarked && fr.student) {
                   setRecentMarks((prev) => [
                     {
-                      id: `mark_${Date.now()}_${Math.random()}`,
+                      id: `mark_${Date.now()}_${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`,
                       name: fr.student.full_name,
                       roll: fr.student.roll_number,
                       time: new Date().toLocaleTimeString(),

@@ -33,7 +33,7 @@ const MAX_EVENTS = 100;
 export function recordDeviceEvent(event: Omit<DeviceEventLog, 'id' | 'timestamp'>) {
   const fullEvent: DeviceEventLog = {
     ...event,
-    id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    id: `evt_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
     timestamp: new Date().toISOString(),
   };
   deviceEventsBuffer.unshift(fullEvent);
@@ -95,6 +95,14 @@ export function broadcastToDashboards(message: any, filterMatch?: { classroom?: 
       }
     }
   }
+}
+
+export function broadcastSecurityThreat(threatEvent: any) {
+  broadcastToDashboards({
+    type: 'SECURITY_ALERT',
+    event: threatEvent,
+    timestamp: new Date().toISOString(),
+  });
 }
 
 export function notifyDeviceTelemetry(device: CampusDevice, telemetry: DeviceTelemetry) {

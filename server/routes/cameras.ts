@@ -60,7 +60,7 @@ router.post('/', authenticateToken, (req, res) => {
   }
 
   const newCamera: RegisteredCamera = {
-    id: `cam_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    id: `cam_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
     name,
     classroom,
     building: building || 'Main Academic Block',

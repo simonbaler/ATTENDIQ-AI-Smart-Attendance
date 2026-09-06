@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   ShieldCheck,
+  ShieldAlert,
   Building2,
   LogOut,
   UserCheck,
@@ -16,7 +17,9 @@ import {
   CheckCircle2,
   ChevronDown,
   Cpu,
+  Video,
 } from 'lucide-react';
+import { iotGatewayClient, IoTGatewayConnectionState } from '../services/iotGatewayClient';
 
 interface NavbarProps {
   activeTab: string;
@@ -33,17 +36,39 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { user, isAdmin, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [wsConnectionState, setWsConnectionState] = useState<IoTGatewayConnectionState>('CONNECTED');
+  const [hasRecentThreat, setHasRecentThreat] = useState(false);
+  const [recentThreatDetails, setRecentThreatDetails] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = iotGatewayClient.onStateChange((state) => {
+      setWsConnectionState(state);
+    });
+    const unsubAlert = iotGatewayClient.onSecurityAlert((alert) => {
+      setHasRecentThreat(true);
+      setRecentThreatDetails(`${alert.event_type} blocked from ${alert.ip_address} (${alert.location?.city || 'LAN'})`);
+      setTimeout(() => setHasRecentThreat(false), 10000);
+    });
+    return () => {
+      unsub();
+      unsubAlert();
+    };
+  }, []);
 
   const primaryTabs = [
     { id: 'overview', label: 'Overview', icon: Activity },
-    { id: 'live-camera', label: 'Live Camera', icon: Camera, liveBadge: !!activeSessionInfo },
-    { id: 'attendance', label: 'Attendance', icon: ShieldCheck },
+    { id: 'live-camera', label: 'Live Attendance', icon: Camera, liveBadge: !!activeSessionInfo },
     { id: 'students', label: 'Students', icon: UserCheck },
-    { id: 'devices', label: 'Devices', icon: Radio },
+    { id: 'departments', label: 'Departments', icon: Building2 },
+    { id: 'devices', label: 'Hardware', icon: Cpu },
+    { id: 'cameras', label: 'Cameras', icon: Video },
     { id: 'intelligence', label: 'Analytics', icon: Sparkles },
+    ...(isAdmin ? [{ id: 'security', label: 'Cyber Defense', icon: ShieldAlert, alertBadge: hasRecentThreat }] : []),
   ];
 
   const adminExtraTabs = [
+    { id: 'security', label: 'Cyber Defense Center', icon: ShieldAlert },
+    { id: 'attendance', label: 'Attendance Logs', icon: ShieldCheck },
     { id: 'sessions', label: 'Sessions', icon: Layers },
     { id: 'users', label: 'Faculty & HODs', icon: Building2 },
     { id: 'validation', label: 'Validation & Hardening', icon: Award },
@@ -122,6 +147,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {tab.liveBadge && (
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
                   )}
+                  {tab.alertBadge && (
+                    <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" title="Recent Intrusion Intercepted" />
+                  )}
                 </button>
               );
             })}
@@ -163,8 +191,33 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </nav>
 
-          {/* Right: Notifications, Voice Assistant, Profile & Logout */}
+          {/* Right: Connection indicator, Notifications, Voice Agent, Profile */}
           <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+            {/* Connection Indicator */}
+            <div
+              className={`hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition ${
+                wsConnectionState === 'CONNECTED'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : wsConnectionState === 'CONNECTING'
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-gray-100 text-gray-600 border-gray-200'
+              }`}
+              title={`IoT Gateway WebSocket: ${wsConnectionState}`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  wsConnectionState === 'CONNECTED'
+                    ? 'bg-emerald-500 animate-pulse'
+                    : wsConnectionState === 'CONNECTING'
+                    ? 'bg-amber-500'
+                    : 'bg-gray-400'
+                }`}
+              />
+              <span className="font-mono text-[11px]">
+                {wsConnectionState === 'CONNECTED' ? 'Gateway Online' : wsConnectionState}
+              </span>
+            </div>
+
             {/* Quick Voice Assistant shortcut */}
             {onOpenVoiceAssistant && (
               <button
@@ -194,6 +247,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span className="text-[10px] text-gray-400">Live</span>
                   </div>
                   <div className="mt-3 space-y-2.5 text-xs">
+                    {recentThreatDetails && (
+                      <div
+                        onClick={() => {
+                          setActiveTab('security');
+                          setShowNotifications(false);
+                        }}
+                        className="cursor-pointer flex items-start space-x-2.5 p-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 transition"
+                      >
+                        <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5 animate-pulse" />
+                        <div>
+                          <p className="font-bold text-red-800">Security Threat Blocked</p>
+                          <p className="text-[11px] text-red-700">
+                            {recentThreatDetails}
+                          </p>
+                          <span className="text-[10px] text-red-600 font-semibold underline mt-0.5 block">
+                            View in Cyber Defense Center →
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-start space-x-2.5 p-2 rounded-xl bg-gray-50">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                       <div>

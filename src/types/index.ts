@@ -280,6 +280,21 @@ export interface HardwareCameraDevice {
   isAttendanceSource: boolean;
 }
 
+export interface DiscoveredUsbDevice {
+  device: any;
+  vendorId: number;
+  productId: number;
+  productName: string;
+  manufacturerName: string;
+  serialNumber?: string;
+  opened: boolean;
+  assignedRole?: string;
+  assignedRoom?: string;
+  assignedBuilding?: string;
+}
+
+export type WebUsbCapabilityState = 'SUPPORTED' | 'UNSUPPORTED' | 'PERMISSION_REQUIRED' | 'BLOCKED_BY_IFRAME';
+
 export interface DiscoveredBluetoothDevice {
   id: string;
   name: string;
@@ -615,7 +630,27 @@ export type SecurityEventType =
   | 'REPEATED_FAILED_LOGIN'
   | 'UNUSUAL_RECOGNITION'
   | 'ATTENDANCE_OVERRIDE'
-  | 'FACE_DATABASE_CHANGE';
+  | 'FACE_DATABASE_CHANGE'
+  | 'INTRUSION_ATTEMPT'
+  | 'SQLI_PROBE'
+  | 'XSS_INJECTION'
+  | 'PATH_TRAVERSAL'
+  | 'COMMAND_INJECTION'
+  | 'EXPLOIT_SCANNER'
+  | 'BRUTE_FORCE'
+  | 'TOKEN_TAMPERING'
+  | 'IP_JAILED';
+
+export interface SecurityEventLocation {
+  city?: string;
+  region?: string;
+  country?: string;
+  country_code?: string;
+  isp?: string;
+  latitude?: number;
+  longitude?: number;
+  flag?: string;
+}
 
 export interface SecurityEvent {
   id: string;
@@ -628,6 +663,12 @@ export interface SecurityEvent {
   details: string;
   timestamp: string;
   ip_address?: string;
+  location?: SecurityEventLocation;
+  user_agent?: string;
+  target_endpoint?: string;
+  attack_payload?: string;
+  blocked?: boolean;
+  jail_status?: 'JAILED' | 'WATCHED' | 'RELEASED' | 'BLOCKED';
 }
 
 // Phase 3: Recognition Event

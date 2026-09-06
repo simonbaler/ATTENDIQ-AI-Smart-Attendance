@@ -173,7 +173,7 @@ const handlePairCreate = async (req: express.Request, res: express.Response) => 
     if (!attSession) {
       const now = new Date();
       const newSess: AttendanceSession = {
-        id: `sess_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        id: `sess_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
         department: user.department || 'Computer Science & Engineering',
         section: 'A',
         subject: 'Classroom Lecture',
@@ -674,7 +674,7 @@ router.post('/frame', (req, res) => {
             } else if (isConfirmed) {
               const now = new Date();
               const newRecord: AttendanceRecord = {
-                id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                id: `att_${Date.now()}_${crypto.randomUUID().split('-')[0]}`,
                 student_id: match.student.id,
                 roll_number: match.student.roll_number,
                 full_name: match.student.full_name,
@@ -857,7 +857,7 @@ router.get('/live-feed/:sessionId', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
-  const subId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const subId = `sub_${Date.now()}_${crypto.randomUUID().split('-')[0]}`;
 
   const sendEvent = (data: any) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
