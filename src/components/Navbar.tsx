@@ -67,7 +67,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   const adminExtraTabs = [
-    { id: 'security', label: 'Cyber Defense Center', icon: ShieldAlert },
     { id: 'attendance', label: 'Attendance Logs', icon: ShieldCheck },
     { id: 'sessions', label: 'Sessions', icon: Layers },
     { id: 'users', label: 'Faculty & HODs', icon: Building2 },
@@ -319,7 +318,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Navigation Scrollbar */}
       <div className="lg:hidden border-t border-gray-200/70 px-4 py-2 bg-gray-50/90 overflow-x-auto scrollbar-none flex items-center space-x-1.5">
-        {[...primaryTabs, ...(isAdmin ? adminExtraTabs : [])].map((tab) => {
+        {Array.from(
+          new Map(
+            [...primaryTabs, ...(isAdmin ? adminExtraTabs : [])].map((tab) => [tab.id, tab])
+          ).values()
+        ).map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
