@@ -10,10 +10,14 @@ import {
   Calendar,
   AlertCircle,
   FileSpreadsheet,
+  User,
+  ShieldCheck,
 } from 'lucide-react';
 import { AttendanceRecord, DepartmentInfo } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { StudentProfileModal } from './StudentProfileModal';
+import { ExplainDecisionModal } from './ExplainDecisionModal';
 
 interface AttendanceTableProps {
   departments: DepartmentInfo[];
@@ -38,6 +42,8 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments })
   const [overrideReason, setOverrideReason] = useState('');
   const [overrideLoading, setOverrideLoading] = useState(false);
   const [overrideError, setOverrideError] = useState<string | null>(null);
+  const [profileStudentId, setProfileStudentId] = useState<string | null>(null);
+  const [explainRecord, setExplainRecord] = useState<AttendanceRecord | null>(null);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -247,11 +253,26 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments })
                 filteredRecords.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3 px-4 font-semibold text-white">
-                      <div>{r.full_name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">{r.student_id}</div>
+                      <button
+                        onClick={() => setProfileStudentId(r.student_id)}
+                        className="text-left group"
+                        title="View Student Intelligence Profile"
+                      >
+                        <div className="font-bold text-white group-hover:text-blue-400 transition flex items-center space-x-1.5">
+                          <span>{r.full_name}</span>
+                          <User className="w-3 h-3 text-blue-400 opacity-0 group-hover:opacity-100 transition" />
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono">{r.student_id}</div>
+                      </button>
                     </td>
                     <td className="py-3 px-4 font-mono font-medium text-slate-200">
-                      {r.roll_number}
+                      <button
+                        onClick={() => setProfileStudentId(r.student_id)}
+                        className="text-left hover:text-blue-300 font-mono transition"
+                        title="View Student Intelligence Profile"
+                      >
+                        {r.roll_number}
+                      </button>
                     </td>
                     <td className="py-3 px-4">
                       <div>{r.department}</div>
@@ -295,7 +316,15 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments })
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-3 px-4 text-right space-x-1.5">
+                      <button
+                        onClick={() => setExplainRecord(r)}
+                        className="px-2 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[11px] font-medium transition inline-flex items-center space-x-1"
+                        title="Inspect biometric verification evidence"
+                      >
+                        <ShieldCheck className="w-3 h-3 text-blue-400" />
+                        <span>Evidence</span>
+                      </button>
                       <button
                         onClick={() => {
                           setOverrideRecord(r);
@@ -391,6 +420,22 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments })
             </form>
           </div>
         </div>
+      )}
+
+      {/* Student Intelligence Profile Modal */}
+      {profileStudentId && (
+        <StudentProfileModal
+          studentIdOrRoll={profileStudentId}
+          onClose={() => setProfileStudentId(null)}
+        />
+      )}
+
+      {/* AI Decision Explainability Evidence Modal */}
+      {explainRecord && (
+        <ExplainDecisionModal
+          record={explainRecord}
+          onClose={() => setExplainRecord(null)}
+        />
       )}
     </div>
   );

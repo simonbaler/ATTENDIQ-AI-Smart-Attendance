@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Sparkles,
   FileSpreadsheet,
+  User,
 } from 'lucide-react';
 import { Student, DepartmentInfo } from '../types';
 import { api } from '../services/api';
@@ -19,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { StudentFormModal } from './StudentFormModal';
 import { FaceEnrollmentModal } from './FaceEnrollmentModal';
 import { GoogleSheetsSyncModal } from './GoogleSheetsSyncModal';
+import { StudentProfileModal } from './StudentProfileModal';
 
 interface StudentDirectoryProps {
   departments: DepartmentInfo[];
@@ -41,6 +43,7 @@ export const StudentDirectory: React.FC<StudentDirectoryProps> = ({ departments 
   const [showSheetsSyncModal, setShowSheetsSyncModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [enrollStudent, setEnrollStudent] = useState<Student | null>(null);
+  const [profileStudentId, setProfileStudentId] = useState<string | null>(null);
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -236,11 +239,26 @@ export const StudentDirectory: React.FC<StudentDirectoryProps> = ({ departments 
                 filteredStudents.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3 px-4">
-                      <div className="font-bold text-white text-sm">{s.full_name}</div>
-                      <div className="text-[10px] font-mono text-slate-500">{s.student_id}</div>
+                      <button
+                        onClick={() => setProfileStudentId(s.id)}
+                        className="text-left group"
+                        title="View Student Intelligence Profile"
+                      >
+                        <div className="font-bold text-white text-sm group-hover:text-blue-400 transition flex items-center space-x-1.5">
+                          <span>{s.full_name}</span>
+                          <User className="w-3 h-3 text-blue-400 opacity-0 group-hover:opacity-100 transition" />
+                        </div>
+                        <div className="text-[10px] font-mono text-slate-500">{s.student_id}</div>
+                      </button>
                     </td>
-                    <td className="py-3 px-4 font-mono font-semibold text-slate-200">
-                      {s.roll_number}
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => setProfileStudentId(s.id)}
+                        className="font-mono font-semibold text-slate-200 hover:text-blue-300 transition text-left"
+                        title="View Student Intelligence Profile"
+                      >
+                        {s.roll_number}
+                      </button>
                     </td>
                     <td className="py-3 px-4">
                       <div className="text-slate-200">{s.department}</div>
@@ -367,6 +385,14 @@ export const StudentDirectory: React.FC<StudentDirectoryProps> = ({ departments 
         }}
         departments={departments}
       />
+
+      {/* Student Intelligence Profile Modal */}
+      {profileStudentId && (
+        <StudentProfileModal
+          studentIdOrRoll={profileStudentId}
+          onClose={() => setProfileStudentId(null)}
+        />
+      )}
     </div>
   );
 };

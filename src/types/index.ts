@@ -76,6 +76,23 @@ export interface AttendanceSession {
   department_stats?: Record<string, DepartmentSessionStat>;
 }
 
+export interface AttendanceVerificationEvidence {
+  face_detected: boolean;
+  detection_score: number;
+  landmarks_valid: boolean;
+  image_quality_valid: boolean;
+  sharpness_score?: number;
+  brightness_value?: number;
+  embedding_similarity: number;
+  similarity_threshold: number;
+  temporal_confirmation: string;
+  liveness_score?: number;
+  liveness_result: string;
+  server_timestamp: string;
+  source_camera?: string;
+  resolution?: string;
+}
+
 export interface AttendanceRecord {
   id: string;
   student_id: string;
@@ -95,6 +112,7 @@ export interface AttendanceRecord {
   created_at: string;
   marked_by: string;
   notes?: string;
+  evidence?: AttendanceVerificationEvidence;
 }
 
 export type MobileCameraStatus = 'PAIRING' | 'CONNECTED' | 'STREAMING' | 'DEGRADED' | 'DISCONNECTED';
@@ -842,5 +860,133 @@ export interface BackupSnapshotInfo {
   total_sessions: number;
   total_audit_logs: number;
   sha256_checksum: string;
+}
+
+export interface TimetableSlot {
+  id: string;
+  department: string;
+  departments?: string[];
+  section: string;
+  classroom: string;
+  subject: string;
+  faculty: string;
+  start_time: string;
+  end_time: string;
+  days: string[];
+  period_number: number;
+  academic_year: string;
+  semester?: string;
+  attendance_frequency?: string;
+  grace_period_minutes?: number;
+  attendance_policy: 'IMMEDIATE_CONFIRMATION' | 'STRICT_TEMPORAL_3F' | 'ROBUST_MULTI_PASS';
+  camera_ids?: string[];
+  is_active: boolean;
+  is_multi_department?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AbsenceNotification {
+  id: string;
+  notification_id: string;
+  student_id: string;
+  roll_number: string;
+  student_name: string;
+  email: string;
+  session_id: string;
+  subject: string;
+  classroom: string;
+  faculty: string;
+  date: string;
+  period: string;
+  sent_at: string;
+  delivery_status: 'DELIVERED' | 'FAILED' | 'RETRY' | 'QUEUED';
+  failure_reason?: string;
+  retry_count: number;
+}
+
+export interface StudentBehaviorEvent {
+  id: string;
+  session_id: string;
+  student_id: string;
+  roll_number: string;
+  student_name: string;
+  timestamp: string;
+  event_type: 'FACE_VERIFIED' | 'HEAD_ORIENTATION_CHANGED' | 'OUTSIDE_CAMERA_VIEW' | 'OBJECT_DETECTED' | 'SESSION_CONCLUDED';
+  signal_label: 'AI-estimated visual signal';
+  details: string;
+  metadata?: {
+    camera_id?: string;
+    classroom?: string;
+    head_pose?: { yaw?: number; pitch?: number; roll?: number };
+    gaze_direction?: string;
+    detected_object?: string;
+    confidence?: number;
+  };
+}
+
+export interface PeriodAttendanceItem {
+  period_time: string;
+  subject: string;
+  classroom: string;
+  faculty?: string;
+  status: 'PRESENT' | 'ABSENT' | 'SCHEDULED';
+  session_id?: string;
+  timestamp?: string;
+}
+
+export interface StudentAnalyticsProfile {
+  student: Student;
+  total_sessions_conducted: number;
+  sessions_attended: number;
+  sessions_absent: number;
+  attendance_percentage: number;
+  daily_attendance?: number;
+  weekly_attendance?: number;
+  monthly_attendance?: number;
+  semester_attendance?: number;
+  daily_timeline?: PeriodAttendanceItem[];
+  consecutive_absences?: number;
+  risk_indicators?: Array<{
+    type: 'LOW_ATTENDANCE_RISK' | 'DECLINING_ATTENDANCE' | 'ABSENCE_PATTERN';
+    severity: 'CRITICAL' | 'WARNING' | 'MONITOR';
+    explanation: string;
+  }>;
+  notifications?: AbsenceNotification[];
+  object_detection_events?: StudentBehaviorEvent[];
+  subject_wise: Record<string, { total: number; attended: number; percentage: number }>;
+  monthly_trend: Array<{ month: string; total: number; attended: number; percentage: number }>;
+  recent_records: AttendanceRecord[];
+  behavior_events: StudentBehaviorEvent[];
+  biometric_readiness: {
+    status: 'READY' | 'ENROLLMENT_REQUIRED';
+    photos_count: number;
+    has_embeddings: boolean;
+    last_biometric_sync?: string;
+    google_sheets_synced: boolean;
+  };
+  has_data: boolean;
+  no_data_reason?: string;
+}
+
+export interface CampusNode3D {
+  id: string;
+  name: string;
+  type: 'BUILDING' | 'CLASSROOM' | 'CAMERA' | 'IOT_GATEWAY';
+  building: string;
+  classroom?: string;
+  department?: string;
+  position: [number, number, number];
+  status: 'ONLINE' | 'OFFLINE' | 'ACTIVE_SESSION' | 'IDLE';
+  metadata?: {
+    active_subject?: string;
+    active_faculty?: string;
+    present_count?: number;
+    total_roster?: number;
+    temperature_c?: number;
+    humidity_pct?: number;
+    stream_profile?: string;
+    ip_address?: string;
+  };
 }
 

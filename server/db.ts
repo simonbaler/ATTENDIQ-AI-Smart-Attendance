@@ -12,6 +12,116 @@ const LOGS_DIR = path.join(DATA_DIR, 'logs');
 const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
 const BENCHMARKS_FILE = path.join(LOGS_DIR, 'benchmark_results.json');
 const MOBILE_CAMERAS_FILE = path.join(DATA_DIR, 'mobile_cameras.json');
+const TIMETABLE_FILE = path.join(DATA_DIR, 'timetable.json');
+const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
+const BEHAVIOR_EVENTS_FILE = path.join(DATA_DIR, 'behavior_events.json');
+
+export interface TimetableSlot {
+  id: string;
+  department: string;
+  departments?: string[];
+  section: string;
+  classroom: string;
+  subject: string;
+  faculty: string;
+  start_time: string;
+  end_time: string;
+  days: string[];
+  period_number: number;
+  academic_year: string;
+  semester?: string;
+  attendance_frequency?: string;
+  grace_period_minutes?: number;
+  attendance_policy: 'IMMEDIATE_CONFIRMATION' | 'STRICT_TEMPORAL_3F' | 'ROBUST_MULTI_PASS';
+  camera_ids?: string[];
+  is_active: boolean;
+  is_multi_department?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AbsenceNotification {
+  id: string;
+  notification_id: string;
+  student_id: string;
+  roll_number: string;
+  student_name: string;
+  email: string;
+  session_id: string;
+  subject: string;
+  classroom: string;
+  faculty: string;
+  date: string;
+  period: string;
+  sent_at: string;
+  delivery_status: 'DELIVERED' | 'FAILED' | 'RETRY' | 'QUEUED';
+  failure_reason?: string;
+  retry_count: number;
+}
+
+export interface StudentBehaviorEvent {
+  id: string;
+  session_id: string;
+  student_id: string;
+  roll_number: string;
+  student_name: string;
+  timestamp: string;
+  event_type: 'FACE_VERIFIED' | 'HEAD_ORIENTATION_CHANGED' | 'OUTSIDE_CAMERA_VIEW' | 'OBJECT_DETECTED' | 'SESSION_CONCLUDED';
+  signal_label: 'AI-estimated visual signal';
+  details: string;
+  metadata?: {
+    camera_id?: string;
+    classroom?: string;
+    head_pose?: { yaw?: number; pitch?: number; roll?: number };
+    gaze_direction?: string;
+    detected_object?: string;
+    confidence?: number;
+  };
+}
+
+export interface PeriodAttendanceItem {
+  period_time: string;
+  subject: string;
+  classroom: string;
+  faculty?: string;
+  status: 'PRESENT' | 'ABSENT' | 'SCHEDULED';
+  session_id?: string;
+  timestamp?: string;
+}
+
+export interface StudentAnalyticsProfile {
+  student: Student;
+  total_sessions_conducted: number;
+  sessions_attended: number;
+  sessions_absent: number;
+  attendance_percentage: number;
+  daily_attendance?: number;
+  weekly_attendance?: number;
+  monthly_attendance?: number;
+  semester_attendance?: number;
+  daily_timeline?: PeriodAttendanceItem[];
+  consecutive_absences?: number;
+  risk_indicators?: Array<{
+    type: 'LOW_ATTENDANCE_RISK' | 'DECLINING_ATTENDANCE' | 'ABSENCE_PATTERN';
+    severity: 'CRITICAL' | 'WARNING' | 'MONITOR';
+    explanation: string;
+  }>;
+  notifications?: AbsenceNotification[];
+  object_detection_events?: StudentBehaviorEvent[];
+  subject_wise: Record<string, { total: number; attended: number; percentage: number }>;
+  monthly_trend: Array<{ month: string; total: number; attended: number; percentage: number }>;
+  recent_records: AttendanceRecord[];
+  behavior_events: StudentBehaviorEvent[];
+  biometric_readiness: {
+    status: 'READY' | 'ENROLLMENT_REQUIRED';
+    photos_count: number;
+    has_embeddings: boolean;
+    last_biometric_sync?: string;
+    google_sheets_synced: boolean;
+  };
+  has_data: boolean;
+  no_data_reason?: string;
+}
 
 export interface User {
   id: string;
@@ -172,6 +282,23 @@ export interface AttendanceSession {
   department_stats?: Record<string, DepartmentSessionStat>;
 }
 
+export interface AttendanceVerificationEvidence {
+  face_detected: boolean;
+  detection_score: number;
+  landmarks_valid: boolean;
+  image_quality_valid: boolean;
+  sharpness_score?: number;
+  brightness_value?: number;
+  embedding_similarity: number;
+  similarity_threshold: number;
+  temporal_confirmation: string; // e.g. "3/3 frames"
+  liveness_score?: number;
+  liveness_result: string;
+  server_timestamp: string;
+  source_camera?: string;
+  resolution?: string;
+}
+
 export interface AttendanceRecord {
   id: string;
   student_id: string;
@@ -191,6 +318,7 @@ export interface AttendanceRecord {
   created_at: string;
   marked_by: string;
   notes?: string;
+  evidence?: AttendanceVerificationEvidence;
 }
 
 export type MobileCameraStatus = 'PAIRING' | 'CONNECTED' | 'STREAMING' | 'DEGRADED' | 'DISCONNECTED';
@@ -261,6 +389,13 @@ export interface SystemSettings {
   webrtc_turn_url?: string;
   webrtc_turn_username?: string;
   webrtc_turn_credential?: string;
+  vision_analytics_enabled?: boolean;
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_pass?: string;
+  smtp_from?: string;
+  smtp_configured?: boolean;
 }
 
 export interface RegisteredCamera {
@@ -809,6 +944,113 @@ export async function initDb() {
     writeJsonFile(CAMPUS_DEVICES_FILE, campusDevices);
     console.log('[DB] Seeded campus IoT hardware registry in strictly OFFLINE status.');
   }
+
+  // 12. Timetable Slots
+  let timetable = readJsonFile<TimetableSlot[]>(TIMETABLE_FILE, []);
+  if (timetable.length === 0) {
+    timetable = [
+      {
+        id: 'slot_c204_01',
+        department: 'CSE',
+        section: 'A',
+        classroom: 'C-204',
+        subject: 'Design & Analysis of Algorithms',
+        faculty: 'Dr. K. Srinivas Rao',
+        start_time: '09:00',
+        end_time: '10:00',
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        period_number: 1,
+        academic_year: '2025-2026 (Even Semester)',
+        attendance_policy: 'STRICT_TEMPORAL_3F',
+        camera_ids: ['cam_c204_front', 'cam_c204_rear'],
+        is_active: true,
+        is_multi_department: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'slot_c204_02',
+        department: 'CSE',
+        section: 'B',
+        classroom: 'C-204',
+        subject: 'Database Management Systems',
+        faculty: 'Prof. P. Ramachandra',
+        start_time: '10:00',
+        end_time: '11:00',
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        period_number: 2,
+        academic_year: '2025-2026 (Even Semester)',
+        attendance_policy: 'STRICT_TEMPORAL_3F',
+        camera_ids: ['cam_c204_front'],
+        is_active: true,
+        is_multi_department: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'slot_lh301_03',
+        department: 'CSE',
+        departments: ['CSE', 'AIML', 'DS'],
+        section: 'ALL',
+        classroom: 'LH-301',
+        subject: 'Artificial Intelligence & Neural Networks',
+        faculty: 'Dr. Ananya Sharma',
+        start_time: '11:15',
+        end_time: '12:15',
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        period_number: 3,
+        academic_year: '2025-2026 (Even Semester)',
+        attendance_policy: 'ROBUST_MULTI_PASS',
+        camera_ids: ['cam_c204_front'],
+        is_active: true,
+        is_multi_department: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'slot_lh204_04',
+        department: 'SE',
+        section: 'A',
+        classroom: 'LH-204',
+        subject: 'Software Architecture & Cloud Systems',
+        faculty: 'Prof. V. Rajesh',
+        start_time: '13:00',
+        end_time: '14:00',
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        period_number: 4,
+        academic_year: '2025-2026 (Even Semester)',
+        attendance_policy: 'STRICT_TEMPORAL_3F',
+        is_active: true,
+        is_multi_department: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'slot_ecelab_05',
+        department: 'ECE',
+        section: 'A',
+        classroom: 'ECE-Lab-1',
+        subject: 'VLSI Design & Microcontrollers',
+        faculty: 'Dr. M. Venkat Reddy',
+        start_time: '14:00',
+        end_time: '15:00',
+        days: ['Monday', 'Wednesday', 'Friday'],
+        period_number: 5,
+        academic_year: '2025-2026 (Even Semester)',
+        attendance_policy: 'STRICT_TEMPORAL_3F',
+        is_active: true,
+        is_multi_department: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ];
+    writeJsonFile(TIMETABLE_FILE, timetable);
+    console.log('[DB] Seeded institutional timetable slots.');
+  }
+
+  // 13. Absence Notifications & Behavior Events files
+  readJsonFile<AbsenceNotification[]>(NOTIFICATIONS_FILE, []);
+  readJsonFile<StudentBehaviorEvent[]>(BEHAVIOR_EVENTS_FILE, []);
 }
 
 // Database helper functions
@@ -2617,6 +2859,414 @@ export const db = {
     });
 
     return correlations;
+  },
+
+  // 12. Timetable Engine (Phase 11 & 11A)
+  getTimetableSlots: (filter?: { department?: string; classroom?: string; day?: string; section?: string }): TimetableSlot[] => {
+    let slots = readJsonFile<TimetableSlot[]>(TIMETABLE_FILE, []);
+    if (filter) {
+      if (filter.department && filter.department !== 'ALL') {
+        const target = filter.department.toLowerCase();
+        slots = slots.filter((s) => {
+          if (s.department.toLowerCase() === target) return true;
+          if (s.is_multi_department && s.departments) {
+            return s.departments.some((d) => d.toLowerCase() === target);
+          }
+          return false;
+        });
+      }
+      if (filter.classroom && filter.classroom !== 'ALL') {
+        slots = slots.filter((s) => s.classroom.toLowerCase() === filter.classroom?.toLowerCase());
+      }
+      if (filter.day && filter.day !== 'ALL') {
+        slots = slots.filter((s) => s.days.some((d) => d.toLowerCase() === filter.day?.toLowerCase()));
+      }
+      if (filter.section && filter.section !== 'ALL') {
+        slots = slots.filter((s) => s.section.toUpperCase() === filter.section?.toUpperCase() || s.section === 'ALL');
+      }
+    }
+    return slots.sort((a, b) => a.period_number - b.period_number);
+  },
+
+  getTimetableSlotById: (id: string): TimetableSlot | undefined => {
+    const slots = readJsonFile<TimetableSlot[]>(TIMETABLE_FILE, []);
+    return slots.find((s) => s.id === id);
+  },
+
+  saveTimetableSlot: (slot: TimetableSlot): void => {
+    const slots = readJsonFile<TimetableSlot[]>(TIMETABLE_FILE, []);
+    const idx = slots.findIndex((s) => s.id === slot.id);
+    if (idx >= 0) {
+      slots[idx] = { ...slot, updated_at: new Date().toISOString() };
+    } else {
+      slots.push({ ...slot, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    }
+    writeJsonFile(TIMETABLE_FILE, slots);
+  },
+
+  deleteTimetableSlot: (id: string): boolean => {
+    const slots = readJsonFile<TimetableSlot[]>(TIMETABLE_FILE, []);
+    const filtered = slots.filter((s) => s.id !== id);
+    if (filtered.length !== slots.length) {
+      writeJsonFile(TIMETABLE_FILE, filtered);
+      return true;
+    }
+    return false;
+  },
+
+  getCurrentActiveTimetableSlot: (currentTime?: string, currentDay?: string): {
+    has_active_slot: boolean;
+    slot?: TimetableSlot;
+    current_time: string;
+    current_day: string;
+  } => {
+    const now = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const activeDay = currentDay || days[now.getDay()];
+    const activeTime = currentTime || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const slots = readJsonFile<TimetableSlot[]>(TIMETABLE_FILE, []);
+    const matchingSlot = slots.find((s) => {
+      if (!s.is_active) return false;
+      const dayMatches = s.days.some((d) => d.toLowerCase() === activeDay.toLowerCase());
+      if (!dayMatches) return false;
+      return s.start_time <= activeTime && activeTime <= s.end_time;
+    });
+
+    return {
+      has_active_slot: !!matchingSlot,
+      slot: matchingSlot,
+      current_time: activeTime,
+      current_day: activeDay,
+    };
+  },
+
+  // 13. Absence Notifications (Phase 15)
+  getAbsenceNotifications: (filter?: { session_id?: string; student_id?: string; delivery_status?: string }): AbsenceNotification[] => {
+    let notifications = readJsonFile<AbsenceNotification[]>(NOTIFICATIONS_FILE, []);
+    if (filter) {
+      if (filter.session_id) notifications = notifications.filter((n) => n.session_id === filter.session_id);
+      if (filter.student_id) notifications = notifications.filter((n) => n.student_id === filter.student_id);
+      if (filter.delivery_status && filter.delivery_status !== 'ALL') {
+        notifications = notifications.filter((n) => n.delivery_status === filter.delivery_status);
+      }
+    }
+    return notifications.sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime());
+  },
+
+  saveAbsenceNotification: (notification: AbsenceNotification): void => {
+    const notifications = readJsonFile<AbsenceNotification[]>(NOTIFICATIONS_FILE, []);
+    const idx = notifications.findIndex((n) => n.id === notification.id || (n.session_id === notification.session_id && n.student_id === notification.student_id));
+    if (idx >= 0) {
+      notifications[idx] = notification;
+    } else {
+      notifications.push(notification);
+    }
+    writeJsonFile(NOTIFICATIONS_FILE, notifications);
+  },
+
+  updateNotificationStatus: (id: string, status: 'DELIVERED' | 'FAILED' | 'RETRY' | 'QUEUED', failure_reason?: string): boolean => {
+    const notifications = readJsonFile<AbsenceNotification[]>(NOTIFICATIONS_FILE, []);
+    const idx = notifications.findIndex((n) => n.id === id || n.notification_id === id);
+    if (idx >= 0) {
+      notifications[idx].delivery_status = status;
+      if (failure_reason) notifications[idx].failure_reason = failure_reason;
+      if (status === 'RETRY') notifications[idx].retry_count += 1;
+      writeJsonFile(NOTIFICATIONS_FILE, notifications);
+      return true;
+    }
+    return false;
+  },
+
+  generateSessionAbsenceNotifications: (sessionId: string): { generated: number; notifications: AbsenceNotification[] } => {
+    const session = db.getSessionById(sessionId);
+    if (!session) return { generated: 0, notifications: [] };
+
+    const attendanceRecords = db.getAttendance({ session_id: sessionId });
+    const presentRolls = new Set(attendanceRecords.filter((r) => r.status === 'PRESENT').map((r) => r.roll_number.toLowerCase().trim()));
+
+    let targetStudents: Student[] = [];
+    if (session.is_multi_department && session.departments) {
+      const allDepts = session.departments;
+      targetStudents = db.getStudents().filter((s) => s.status === 'ACTIVE' && allDepts.some((d) => d.toLowerCase() === s.department.toLowerCase()));
+    } else {
+      targetStudents = db.getStudents({
+        department: session.department,
+        section: session.section !== 'ALL' ? session.section : undefined,
+        status: 'ACTIVE',
+      });
+    }
+
+    const absentStudents = targetStudents.filter((s) => !presentRolls.has(s.roll_number.toLowerCase().trim()));
+    const existingNotifications = db.getAbsenceNotifications({ session_id: sessionId });
+    const notifiedStudentIds = new Set(existingNotifications.map((n) => n.student_id));
+
+    const newlyCreated: AbsenceNotification[] = [];
+    const dateFormatted = session.date || new Date().toISOString().split('T')[0];
+
+    const settings = db.getSettings();
+    const hasEmailProvider = Boolean(process.env.SMTP_HOST || (settings.smtp_configured && settings.smtp_host));
+
+    absentStudents.forEach((student, index) => {
+      if (notifiedStudentIds.has(student.id)) return;
+
+      const notifId = `ABS-${dateFormatted.replace(/-/g, '')}-${sessionId.slice(-4)}-${String(index + 1).padStart(3, '0')}`;
+      const notification: AbsenceNotification = {
+        id: `notif_${crypto.randomUUID()}`,
+        notification_id: notifId,
+        student_id: student.id,
+        roll_number: student.roll_number,
+        student_name: student.full_name,
+        email: student.email || `${student.roll_number.toLowerCase()}@sits.ac.in`,
+        session_id: sessionId,
+        subject: session.subject,
+        classroom: session.classroom,
+        faculty: session.faculty || 'Assigned Course Faculty',
+        date: session.date,
+        period: `${session.start_time} - ${session.end_time}`,
+        sent_at: new Date().toISOString(),
+        delivery_status: hasEmailProvider ? 'DELIVERED' : 'FAILED',
+        failure_reason: hasEmailProvider ? undefined : 'Email delivery unavailable — provider not configured',
+        retry_count: 0,
+      };
+
+      db.saveAbsenceNotification(notification);
+      newlyCreated.push(notification);
+    });
+
+    return { generated: newlyCreated.length, notifications: newlyCreated };
+  },
+
+  // 14. Student Behavioral Timeline (Phase 13 & 14)
+  getStudentBehaviorEvents: (filter?: { session_id?: string; student_id?: string }): StudentBehaviorEvent[] => {
+    let events = readJsonFile<StudentBehaviorEvent[]>(BEHAVIOR_EVENTS_FILE, []);
+    if (filter) {
+      if (filter.session_id) events = events.filter((e) => e.session_id === filter.session_id);
+      if (filter.student_id) events = events.filter((e) => e.student_id === filter.student_id || e.roll_number.toLowerCase() === filter.student_id?.toLowerCase());
+    }
+    return events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  },
+
+  saveStudentBehaviorEvent: (event: StudentBehaviorEvent): void => {
+    const events = readJsonFile<StudentBehaviorEvent[]>(BEHAVIOR_EVENTS_FILE, []);
+    events.push(event);
+    if (events.length > 5000) {
+      events.splice(0, events.length - 5000);
+    }
+    writeJsonFile(BEHAVIOR_EVENTS_FILE, events);
+  },
+
+  // 15. Student Profile & Analytics (Phase 16 & 16A)
+  getStudentProfileAnalytics: (studentIdOrRoll: string): StudentAnalyticsProfile | null => {
+    const student = db.getStudentById(studentIdOrRoll) || db.getStudentByRollNumber(studentIdOrRoll);
+    if (!student) return null;
+
+    const allSessions = db.getSessions().filter((sess) => {
+      if (sess.status !== 'COMPLETED' && sess.status !== 'ACTIVE') return false;
+      if (sess.is_multi_department && sess.departments) {
+        return sess.departments.some((d) => d.toLowerCase() === student.department.toLowerCase());
+      }
+      const deptMatches = sess.department.toLowerCase() === student.department.toLowerCase();
+      const secMatches = sess.section === 'ALL' || sess.section.toUpperCase() === student.section.toUpperCase();
+      return deptMatches && secMatches;
+    });
+
+    const totalSessions = allSessions.length;
+    const records = db.getAttendance({ student_id: student.id });
+    const presentRecords = records.filter((r) => r.status === 'PRESENT');
+    const attendedCount = presentRecords.length;
+    const absentCount = Math.max(0, totalSessions - attendedCount);
+    const overallPct = totalSessions > 0 ? Math.round((attendedCount / totalSessions) * 100) : 0;
+
+    const subjectWise: Record<string, { total: number; attended: number; percentage: number }> = {};
+    allSessions.forEach((sess) => {
+      const subj = sess.subject || 'General Academic';
+      if (!subjectWise[subj]) {
+        subjectWise[subj] = { total: 0, attended: 0, percentage: 0 };
+      }
+      subjectWise[subj].total += 1;
+    });
+
+    presentRecords.forEach((rec) => {
+      const subj = rec.subject || 'General Academic';
+      if (subjectWise[subj]) {
+        subjectWise[subj].attended += 1;
+      }
+    });
+
+    Object.keys(subjectWise).forEach((subj) => {
+      const item = subjectWise[subj];
+      item.percentage = item.total > 0 ? Math.round((item.attended / item.total) * 100) : 0;
+    });
+
+    const monthlyMap: Record<string, { total: number; attended: number }> = {};
+    allSessions.forEach((sess) => {
+      const monthKey = (sess.date || sess.created_at || '').slice(0, 7) || '2026-09';
+      if (!monthlyMap[monthKey]) monthlyMap[monthKey] = { total: 0, attended: 0 };
+      monthlyMap[monthKey].total += 1;
+    });
+
+    presentRecords.forEach((rec) => {
+      const monthKey = (rec.date || rec.created_at || '').slice(0, 7) || '2026-09';
+      if (monthlyMap[monthKey]) monthlyMap[monthKey].attended += 1;
+    });
+
+    const monthlyTrend = Object.entries(monthlyMap)
+      .map(([month, data]) => ({
+        month,
+        total: data.total,
+        attended: data.attended,
+        percentage: data.total > 0 ? Math.round((data.attended / data.total) * 100) : 0,
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+
+    const behaviorEvents = db.getStudentBehaviorEvents({ student_id: student.id });
+    const objectEvents = behaviorEvents.filter((e) => e.event_type === 'OBJECT_DETECTED');
+    const notifications = db.getAbsenceNotifications({ student_id: student.id });
+
+    // Hourly / Period-wise Attendance & Daily Timeline
+    const now = new Date();
+    const todayStr = (now.toISOString().split('T')[0]);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDay = dayNames[now.getDay()];
+
+    const timetableSlots = readJsonFile<TimetableSlot[]>(TIMETABLE_FILE, []);
+    const matchingSlots = timetableSlots
+      .filter((s) => {
+        if (!s.is_active) return false;
+        const matchesDay = s.days.some((d) => d.toLowerCase() === currentDay.toLowerCase());
+        const matchesDept = s.department.toLowerCase() === student.department.toLowerCase() ||
+          (s.is_multi_department && s.departments?.some((d) => d.toLowerCase() === student.department.toLowerCase()));
+        const matchesSec = s.section === 'ALL' || s.section.toUpperCase() === student.section.toUpperCase();
+        return matchesDay && matchesDept && matchesSec;
+      })
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+    const todaySessions = allSessions.filter((s) => (s.date || s.created_at || '').startsWith(todayStr));
+    const todayRecords = records.filter((r) => (r.date || r.created_at || '').startsWith(todayStr));
+
+    const dailyTimeline: PeriodAttendanceItem[] = matchingSlots.map((slot) => {
+      const activeOrPastSession = todaySessions.find((sess) =>
+        sess.subject.toLowerCase() === slot.subject.toLowerCase() ||
+        sess.classroom.toLowerCase() === slot.classroom.toLowerCase()
+      );
+
+      let status: 'PRESENT' | 'ABSENT' | 'SCHEDULED' = 'SCHEDULED';
+      let recordTimestamp: string | undefined = undefined;
+      let matchedSessionId: string | undefined = activeOrPastSession?.id;
+
+      if (activeOrPastSession) {
+        const rec = todayRecords.find((r) => r.session_id === activeOrPastSession.id);
+        if (rec) {
+          status = rec.status === 'PRESENT' ? 'PRESENT' : 'ABSENT';
+          recordTimestamp = rec.created_at || (rec.date && rec.time ? `${rec.date} ${rec.time}` : undefined);
+        } else if (activeOrPastSession.status === 'COMPLETED') {
+          status = 'ABSENT';
+        }
+      }
+
+      return {
+        period_time: `${slot.start_time} - ${slot.end_time}`,
+        subject: slot.subject,
+        classroom: slot.classroom,
+        faculty: slot.faculty,
+        status,
+        session_id: matchedSessionId,
+        timestamp: recordTimestamp,
+      };
+    });
+
+    // Time-Granular Attendance Calculations
+    const todayConducted = todaySessions.length;
+    const todayAttended = todayRecords.filter((r) => r.status === 'PRESENT').length;
+    const dailyAttendance = todayConducted > 0 ? Math.round((todayAttended / todayConducted) * 100) : (totalSessions > 0 ? overallPct : 0);
+
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const weekSessions = allSessions.filter((s) => new Date(s.date || s.created_at).getTime() >= sevenDaysAgo.getTime());
+    const weekRecords = records.filter((r) => new Date(r.date || r.created_at).getTime() >= sevenDaysAgo.getTime() && r.status === 'PRESENT');
+    const weeklyAttendance = weekSessions.length > 0 ? Math.round((weekRecords.length / weekSessions.length) * 100) : overallPct;
+
+    const currentMonthPrefix = todayStr.slice(0, 7);
+    const monthSessions = allSessions.filter((s) => (s.date || s.created_at || '').startsWith(currentMonthPrefix));
+    const monthRecords = records.filter((r) => (r.date || r.created_at || '').startsWith(currentMonthPrefix) && r.status === 'PRESENT');
+    const monthlyAttendance = monthSessions.length > 0 ? Math.round((monthRecords.length / monthSessions.length) * 100) : overallPct;
+
+    // Consecutive Absences & Risk Factors
+    let consecutiveAbsences = 0;
+    for (const rec of records) {
+      if (rec.status === 'ABSENT') {
+        consecutiveAbsences++;
+      } else {
+        break;
+      }
+    }
+
+    const riskIndicators: Array<{
+      type: 'LOW_ATTENDANCE_RISK' | 'DECLINING_ATTENDANCE' | 'ABSENCE_PATTERN';
+      severity: 'CRITICAL' | 'WARNING' | 'MONITOR';
+      explanation: string;
+    }> = [];
+
+    if (totalSessions > 0 && overallPct < 75) {
+      riskIndicators.push({
+        type: 'LOW_ATTENDANCE_RISK',
+        severity: overallPct < 60 ? 'CRITICAL' : 'WARNING',
+        explanation: `Attendance is ${overallPct}%, below the institutional benchmark of 75%.`,
+      });
+    }
+
+    if (monthlyTrend.length >= 2) {
+      const prev = monthlyTrend[monthlyTrend.length - 2].percentage;
+      const cur = monthlyTrend[monthlyTrend.length - 1].percentage;
+      if (cur < prev && (prev - cur) >= 10) {
+        riskIndicators.push({
+          type: 'DECLINING_ATTENDANCE',
+          severity: 'WARNING',
+          explanation: `Turnout declined by ${prev - cur}% compared to previous academic month.`,
+        });
+      }
+    }
+
+    if (consecutiveAbsences >= 2) {
+      riskIndicators.push({
+        type: 'ABSENCE_PATTERN',
+        severity: consecutiveAbsences >= 3 ? 'CRITICAL' : 'WARNING',
+        explanation: `${consecutiveAbsences} consecutive class absences recorded.`,
+      });
+    }
+
+    const hasData = totalSessions > 0;
+    const noDataReason = hasData ? undefined : 'No attendance sessions have been conducted for this department and section yet.';
+
+    return {
+      student,
+      total_sessions_conducted: totalSessions,
+      sessions_attended: attendedCount,
+      sessions_absent: absentCount,
+      attendance_percentage: overallPct,
+      daily_attendance: dailyAttendance,
+      weekly_attendance: weeklyAttendance,
+      monthly_attendance: monthlyAttendance,
+      semester_attendance: overallPct,
+      daily_timeline: dailyTimeline,
+      consecutive_absences: consecutiveAbsences,
+      risk_indicators: riskIndicators,
+      notifications: notifications.slice(0, 15),
+      object_detection_events: objectEvents,
+      subject_wise: subjectWise,
+      monthly_trend: monthlyTrend,
+      recent_records: records.slice(0, 25),
+      behavior_events: behaviorEvents,
+      biometric_readiness: {
+        status: student.face_registered ? 'READY' : 'ENROLLMENT_REQUIRED',
+        photos_count: student.face_images_count || (student.face_images?.length ?? 0),
+        has_embeddings: (student.encodings?.length ?? 0) > 0 || !!student.mean_encoding,
+        last_biometric_sync: student.updated_at,
+        google_sheets_synced: true,
+      },
+      has_data: hasData,
+      no_data_reason: noDataReason,
+    };
   },
 };
 

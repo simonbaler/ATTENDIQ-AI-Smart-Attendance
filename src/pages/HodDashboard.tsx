@@ -10,6 +10,9 @@ import { SessionModal } from '../components/SessionModal';
 import { StudentFormModal } from '../components/StudentFormModal';
 import { VoiceAssistant } from '../components/VoiceAssistant';
 import { CyberDefenseView } from '../components/CyberDefenseView';
+import { TimetableEngineView } from '../components/TimetableEngineView';
+import { AbsenceNotificationView } from '../components/AbsenceNotificationView';
+import { SystemHealthCenterView } from '../components/SystemHealthCenterView';
 import { DepartmentInfo, AttendanceSession } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -83,6 +86,21 @@ export const HodDashboard: React.FC = () => {
             onRequestNewSession={() => setShowSessionModal(true)}
           />
         )}
+
+        {activeTab === 'timetable' && (
+          <TimetableEngineView
+            userRole="HOD"
+            userDepartment={user?.department}
+            onTriggerSession={(session) => {
+              setActiveSession(session);
+              setActiveTab('live-camera');
+            }}
+          />
+        )}
+
+        {activeTab === 'notifications' && <AbsenceNotificationView />}
+
+        {activeTab === 'observability' && <SystemHealthCenterView />}
 
         {activeTab === 'devices' && <CampusDeviceManager userRole="HOD" userDepartment={user?.department} />}
 

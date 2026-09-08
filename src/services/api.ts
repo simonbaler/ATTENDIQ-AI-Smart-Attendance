@@ -11,6 +11,10 @@ import {
   SmartClassroomCorrelation,
   RemoteSensingData,
   DeviceTelemetry,
+  TimetableSlot,
+  AbsenceNotification,
+  StudentBehaviorEvent,
+  StudentAnalyticsProfile,
 } from '../types';
 
 const API_BASE = '/api';
@@ -1208,6 +1212,161 @@ export const api = {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+
+  // Timetable Engine (Phase 11 & 11A)
+  async getTimetableSlots(filter?: { department?: string; classroom?: string; day?: string; section?: string }): Promise<{ success: boolean; slots: TimetableSlot[] }> {
+    const params = new URLSearchParams();
+    if (filter?.department) params.append('department', filter.department);
+    if (filter?.classroom) params.append('classroom', filter.classroom);
+    if (filter?.day) params.append('day', filter.day);
+    if (filter?.section) params.append('section', filter.section);
+
+    const res = await fetch(`${API_BASE}/timetable?${params.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getActiveTimetableSlot(): Promise<{
+    success: boolean;
+    has_active_slot: boolean;
+    slot?: TimetableSlot;
+    current_time: string;
+    current_day: string;
+    active_session?: AttendanceSession;
+  }> {
+    const res = await fetch(`${API_BASE}/timetable/active`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async createTimetableSlot(slot: Partial<TimetableSlot>): Promise<{ success: boolean; slot: TimetableSlot; message?: string }> {
+    const res = await fetch(`${API_BASE}/timetable`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(slot),
+    });
+    return res.json();
+  },
+
+  async updateTimetableSlot(id: string, slot: Partial<TimetableSlot>): Promise<{ success: boolean; slot: TimetableSlot; message?: string }> {
+    const res = await fetch(`${API_BASE}/timetable/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(slot),
+    });
+    return res.json();
+  },
+
+  async deleteTimetableSlot(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/timetable/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async triggerTimetableSession(slotId: string): Promise<{ success: boolean; message: string; session: AttendanceSession }> {
+    const res = await fetch(`${API_BASE}/timetable/trigger-session/${slotId}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  // Automated Absence Notifications (Phase 15)
+  async getAbsenceNotifications(filter?: { session_id?: string; student_id?: string; delivery_status?: string }): Promise<{
+    success: boolean;
+    count: number;
+    notifications: AbsenceNotification[];
+  }> {
+    const params = new URLSearchParams();
+    if (filter?.session_id) params.append('session_id', filter.session_id);
+    if (filter?.student_id) params.append('student_id', filter.student_id);
+    if (filter?.delivery_status) params.append('delivery_status', filter.delivery_status);
+
+    const res = await fetch(`${API_BASE}/notifications?${params.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getNotificationStats(): Promise<{
+    success: boolean;
+    total: number;
+    delivered: number;
+    failed: number;
+    queued: number;
+    retry: number;
+    last_dispatched_at: string | null;
+  }> {
+    const res = await fetch(`${API_BASE}/notifications/stats`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async dispatchSessionAbsenceNotifications(sessionId: string): Promise<{
+    success: boolean;
+    message: string;
+    generated: number;
+    notifications: AbsenceNotification[];
+  }> {
+    const res = await fetch(`${API_BASE}/notifications/dispatch-session/${sessionId}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async retryAbsenceNotification(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/notifications/${id}/retry`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  // Student Profile Intelligence & Behavior Analytics (Phase 16 & 16A)
+  async getStudentProfile(studentIdOrRoll: string): Promise<{ success: boolean; profile: StudentAnalyticsProfile }> {
+    const res = await fetch(`${API_BASE}/analytics/student/${encodeURIComponent(studentIdOrRoll)}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async recordBehaviorEvent(event: {
+    session_id: string;
+    student_id: string;
+    roll_number?: string;
+    student_name?: string;
+    event_type: string;
+    details?: string;
+    metadata?: any;
+  }): Promise<{ success: boolean; event?: StudentBehaviorEvent; message?: string }> {
+    const res = await fetch(`${API_BASE}/analytics/behavior`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(event),
+    });
+    return res.json();
+  },
+
+  async getSessionBehaviorEvents(sessionId: string): Promise<{ success: boolean; count: number; events: StudentBehaviorEvent[] }> {
+    const res = await fetch(`${API_BASE}/analytics/behavior/session/${sessionId}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  // Production Observability & System Health Center (Phase 20)
+  async getObservabilityHealth(): Promise<any> {
+    const res = await fetch(`${API_BASE}/analytics/observability/health`, {
+      headers: getAuthHeaders(),
     });
     return res.json();
   },

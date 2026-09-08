@@ -18,6 +18,9 @@ import {
   ChevronDown,
   Cpu,
   Video,
+  Calendar,
+  Mail,
+  HeartPulse,
 } from 'lucide-react';
 import { iotGatewayClient, IoTGatewayConnectionState } from '../services/iotGatewayClient';
 
@@ -58,8 +61,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   const primaryTabs = [
     { id: 'overview', label: 'Overview', icon: Activity },
     { id: 'live-camera', label: 'Live Attendance', icon: Camera, liveBadge: !!activeSessionInfo },
+    { id: 'timetable', label: 'Timetable', icon: Calendar },
     { id: 'students', label: 'Students', icon: UserCheck },
     { id: 'departments', label: 'Departments', icon: Building2 },
+    { id: 'notifications', label: 'Absence Alerts', icon: Mail },
     { id: 'devices', label: 'Hardware', icon: Cpu },
     { id: 'cameras', label: 'Cameras', icon: Video },
     { id: 'intelligence', label: 'Analytics', icon: Sparkles },
@@ -67,6 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   const adminExtraTabs = [
+    { id: 'observability', label: 'System Health', icon: HeartPulse },
     { id: 'attendance', label: 'Attendance Logs', icon: ShieldCheck },
     { id: 'sessions', label: 'Sessions', icon: Layers },
     { id: 'users', label: 'Faculty & HODs', icon: Building2 },

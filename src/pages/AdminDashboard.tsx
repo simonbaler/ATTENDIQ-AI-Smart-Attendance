@@ -17,6 +17,9 @@ import { DepartmentInfo, AttendanceSession } from '../types';
 import { api } from '../services/api';
 import { CameraSourceManager } from '../components/CameraSourceManager';
 import { CyberDefenseView } from '../components/CyberDefenseView';
+import { TimetableEngineView } from '../components/TimetableEngineView';
+import { AbsenceNotificationView } from '../components/AbsenceNotificationView';
+import { SystemHealthCenterView } from '../components/SystemHealthCenterView';
 import { hardwareDiscovery, HardwareCameraDevice } from '../services/hardwareDiscovery';
 
 export const AdminDashboard: React.FC = () => {
@@ -92,6 +95,20 @@ export const AdminDashboard: React.FC = () => {
             onRequestNewSession={() => setShowSessionModal(true)}
           />
         )}
+
+        {activeTab === 'timetable' && (
+          <TimetableEngineView
+            userRole="ADMIN"
+            onTriggerSession={(session) => {
+              setActiveSession(session);
+              setActiveTab('live-camera');
+            }}
+          />
+        )}
+
+        {activeTab === 'notifications' && <AbsenceNotificationView />}
+
+        {activeTab === 'observability' && <SystemHealthCenterView />}
 
         {activeTab === 'departments' && (
           <SessionsView

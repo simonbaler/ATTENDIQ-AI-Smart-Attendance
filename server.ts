@@ -15,6 +15,10 @@ import mobileRouter from './server/routes/mobile.js';
 import camerasRouter from './server/routes/cameras.js';
 import devicesRouter from './server/routes/devices.js';
 import securityRouter from './server/routes/security.js';
+import timetableRouter from './server/routes/timetable.js';
+import notificationsRouter from './server/routes/notifications.js';
+import analyticsRouter from './server/routes/analytics.js';
+import eventsRouter from './server/routes/events.js';
 import { createSignalingServer } from './server/signaling.js';
 import { createIoTGatewayServer } from './server/iotGateway.js';
 import { cyberDefenseMiddleware, CyberDefense } from './server/securityGuard.js';
@@ -116,6 +120,10 @@ async function startServer() {
   app.use('/api/mobile', mobileRouter);
   app.use('/api/cameras', camerasRouter);
   app.use('/api/devices', devicesRouter);
+  app.use('/api/timetable', timetableRouter);
+  app.use('/api/notifications', notificationsRouter);
+  app.use('/api/analytics', analyticsRouter);
+  app.use('/api/events', eventsRouter);
   app.use('/api', intelligenceRouter);
   app.use('/api', settingsRouter);
 

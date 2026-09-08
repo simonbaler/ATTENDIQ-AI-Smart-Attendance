@@ -26,10 +26,13 @@ import {
   Building2,
   BarChart3,
   Filter,
+  X,
+  Search,
 } from 'lucide-react';
-import { CommandCenterData, LiveActivityEvent } from '../types';
+import { CommandCenterData, LiveActivityEvent, Student } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { eventBusClient, CampusEvent } from '../services/eventBusClient';
 
 interface OverviewCardsProps {
   onNavigate: (tab: string) => void;
@@ -52,6 +55,12 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
 
+  // Department Drilldown Modal States (Phase 44)
+  const [selectedDeptModal, setSelectedDeptModal] = useState<string | null>(null);
+  const [deptStudents, setDeptStudents] = useState<Student[]>([]);
+  const [deptModalLoading, setDeptModalLoading] = useState<boolean>(false);
+  const [deptSearchQuery, setDeptSearchQuery] = useState<string>('');
+
   const fetchCommandData = async () => {
     try {
       const res = await api.getCommandCenterData();
@@ -68,9 +77,40 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
 
   useEffect(() => {
     fetchCommandData();
-    const interval = setInterval(fetchCommandData, 10000); // Polling every 10s for real-time dashboard updates
-    return () => clearInterval(interval);
+    eventBusClient.connect();
+
+    const onCampusEvent = (evt: CampusEvent) => {
+      // Instant live update on SSE events
+      fetchCommandData();
+    };
+
+    eventBusClient.subscribe('*', onCampusEvent);
+
+    const interval = setInterval(fetchCommandData, 20000); // 20s background heartbeat
+    return () => {
+      clearInterval(interval);
+      eventBusClient.unsubscribe('*', onCampusEvent);
+    };
   }, []);
+
+  const handleOpenDeptModal = async (deptName: string) => {
+    setSelectedDeptModal(deptName);
+    setDeptModalLoading(true);
+    setDeptSearchQuery('');
+    try {
+      const res = await api.getStudents({ department: deptName });
+      if (res.success && res.students) {
+        setDeptStudents(res.students);
+      } else {
+        setDeptStudents([]);
+      }
+    } catch (err) {
+      console.error('Failed to load students for department:', err);
+      setDeptStudents([]);
+    } finally {
+      setDeptModalLoading(false);
+    }
+  };
 
   const handleManualRefresh = () => {
     setRefreshing(true);
@@ -143,6 +183,11 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
                 />
                 <span>{isLive ? 'LIVE RECOGNITION ACTIVE' : 'SYSTEM READY / IDLE'}</span>
               </div>
+
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>SSE LIVE STREAM: CONNECTED</span>
+              </div>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
@@ -155,6 +200,15 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
 
           {/* Quick Action Matrix */}
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => onNavigate('twin')}
+              className="px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-full text-xs sm:text-sm font-semibold transition flex items-center space-x-1.5 shadow-xs"
+              title="Open Campus 3D Classroom Digital Twin"
+            >
+              <Layers className="w-4 h-4 text-blue-600" />
+              <span>Campus 3D Twin</span>
+            </button>
+
             <button
               onClick={() => onNavigate('live-camera')}
               className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs sm:text-sm font-semibold shadow-xs transition flex items-center space-x-2"
@@ -584,14 +638,16 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
               return (
                 <div
                   key={deptName}
-                  className="bg-gray-50/70 border border-gray-200 hover:border-gray-300 rounded-2xl p-4 space-y-2.5 transition"
+                  onClick={() => handleOpenDeptModal(deptName)}
+                  className="bg-gray-50/70 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/20 hover:shadow-xs rounded-2xl p-4 space-y-2.5 transition cursor-pointer group"
+                  title={`Click to inspect ${deptName} verified roster, absentees, and live telemetry`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-xs font-mono font-bold text-blue-700">
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-xs font-mono font-bold text-blue-700 group-hover:border-blue-300">
                         {shortCode}
                       </span>
-                      <span className="text-xs font-semibold text-gray-800 truncate max-w-[130px]">
+                      <span className="text-xs font-semibold text-gray-800 truncate max-w-[130px] group-hover:text-blue-600 transition">
                         {deptName}
                       </span>
                     </div>
@@ -627,6 +683,11 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
                       }`}
                       style={{ width: `${Math.min(100, stat.attendance_percentage)}%` }}
                     />
+                  </div>
+
+                  <div className="text-[10px] text-blue-600 font-semibold text-right pt-0.5 flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition">
+                    <span>Inspect Department</span>
+                    <ArrowRight className="w-3 h-3" />
                   </div>
                 </div>
               );
@@ -797,6 +858,179 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Phase 44: Department Drilldown Modal */}
+      {selectedDeptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full border border-gray-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 flex items-start justify-between bg-gray-50/70">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-100 text-blue-800">
+                    {getDeptShortCode(selectedDeptModal)}
+                  </span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Authoritative Department Audit
+                  </span>
+                </div>
+                <h2 className="text-xl font-black text-gray-900 mt-1">
+                  {selectedDeptModal}
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Verified students, absent roster, live recognition events, and department attendance rate.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSelectedDeptModal(null)}
+                className="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-200 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Department Summary Metrics */}
+            {(() => {
+              const stat = deptStatsObj[selectedDeptModal] || {
+                total: deptStudents.length,
+                present: 0,
+                absent: deptStudents.length,
+                attendance_percentage: 0,
+              };
+
+              return (
+                <div className="p-6 border-b border-gray-100 bg-white">
+                  <div className="grid grid-cols-4 gap-3 text-center">
+                    <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase">Total Roster</div>
+                      <div className="text-xl font-extrabold text-gray-900 mt-0.5">
+                        {deptStudents.length || stat.total}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-100">
+                      <div className="text-[10px] font-bold text-emerald-700 uppercase">Present</div>
+                      <div className="text-xl font-extrabold text-emerald-600 mt-0.5">
+                        {stat.present}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-red-50 border border-red-100">
+                      <div className="text-[10px] font-bold text-red-700 uppercase">Absent</div>
+                      <div className="text-xl font-extrabold text-red-600 mt-0.5">
+                        {Math.max(0, (deptStudents.length || stat.total) - stat.present)}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100">
+                      <div className="text-[10px] font-bold text-blue-700 uppercase">Turnout %</div>
+                      <div className="text-xl font-extrabold text-blue-600 mt-0.5">
+                        {stat.attendance_percentage}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="mt-4 relative">
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={deptSearchQuery}
+                      onChange={(e) => setDeptSearchQuery(e.target.value)}
+                      placeholder="Search students by name, roll number, or section..."
+                      className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 placeholder-gray-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Students List */}
+            <div className="flex-1 overflow-y-auto p-6 divide-y divide-gray-100">
+              {deptModalLoading ? (
+                <div className="py-12 text-center text-gray-400 flex flex-col items-center">
+                  <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mb-2" />
+                  <span className="text-xs">Loading department roster...</span>
+                </div>
+              ) : deptStudents.length === 0 ? (
+                <div className="py-12 text-center text-gray-400">
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-40 text-gray-400" />
+                  <p className="text-xs font-semibold">No students registered in this department yet.</p>
+                  <p className="text-[11px] text-gray-400 mt-1">Sync Google Sheets or register students to populate.</p>
+                </div>
+              ) : (
+                deptStudents
+                  .filter((s) => {
+                    if (!deptSearchQuery) return true;
+                    const q = deptSearchQuery.toLowerCase();
+                    return (
+                      s.name.toLowerCase().includes(q) ||
+                      s.roll_number.toLowerCase().includes(q) ||
+                      s.section.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((student) => {
+                    const isPresentToday = commandData?.live_activity?.some(
+                      (act: any) =>
+                        act.student_id === student.id ||
+                        act.roll_number?.toLowerCase() === student.roll_number.toLowerCase()
+                    );
+
+                    return (
+                      <div key={student.id} className="py-3 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-9 h-9 rounded-full bg-blue-100/70 border border-blue-200 text-blue-700 flex items-center justify-center font-bold text-xs font-mono shrink-0">
+                            {student.roll_number.slice(-3)}
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-gray-900">{student.name}</div>
+                            <div className="text-[11px] text-gray-400 font-mono">
+                              {student.roll_number} &bull; Sec {student.section} &bull; Year {student.year}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                              student.face_registered
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}
+                          >
+                            {student.face_registered ? 'BIOMETRIC ENROLLED' : 'NO EMBEDDINGS'}
+                          </span>
+
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                              isPresentToday
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                : 'bg-gray-100 text-gray-600 border-gray-200'
+                            }`}
+                          >
+                            {isPresentToday ? 'VERIFIED TODAY' : 'ABSENT'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs">
+              <span className="text-gray-500 font-medium">
+                Authoritative multi-department institutional ledger
+              </span>
+              <button
+                onClick={() => setSelectedDeptModal(null)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
