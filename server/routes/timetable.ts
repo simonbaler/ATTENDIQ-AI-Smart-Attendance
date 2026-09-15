@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { db, TimetableSlot, AttendanceSession, DepartmentRosterInfo, DepartmentSessionStat } from '../db.js';
 import { authenticateToken } from './auth.js';
+import { eventBus } from '../eventBus.js';
 
 const router = express.Router();
 
@@ -243,6 +244,22 @@ router.post('/trigger-session/:id', authenticateToken, (req, res) => {
     };
 
     db.saveSession(newSession);
+
+    // Broadcast automated session start across Campus Event Bus
+    eventBus.publish('TIMETABLE_SESSION_STARTED', {
+      source: 'TIMETABLE_ENGINE',
+      classroom: newSession.classroom,
+      sessionId: newSession.id,
+      payload: {
+        session_id: newSession.id,
+        subject: newSession.subject,
+        classroom: newSession.classroom,
+        department: newSession.department,
+        faculty: newSession.faculty,
+        period_number: slot.period_number,
+        total_students: totalRosterCount,
+      },
+    });
 
     db.logAudit({
       action: 'TIMETABLE_SESSION_AUTOMATION',

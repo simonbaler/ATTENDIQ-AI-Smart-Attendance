@@ -2,6 +2,7 @@ import express from 'express';
 import { db, AttendanceSession, DepartmentRosterInfo, DepartmentSessionStat } from '../db.js';
 import { authenticateToken } from './auth.js';
 import { clearSessionTracking } from '../recognition.js';
+import { eventBus } from '../eventBus.js';
 
 const router = express.Router();
 
@@ -442,11 +443,53 @@ router.post('/:id/stop', authenticateToken, (req, res) => {
     details: `Completed session ${session.subject} (${session.classroom}). Total: ${finalStats.total_students}, Present: ${finalStats.present_count} (${finalStats.attendance_percentage}%)`,
   });
 
+  // Automatically resolve absentees and trigger notification workflow
+  const absenceResult = db.generateSessionAbsenceNotifications(session.id);
+
+  // Publish SSE events to Campus Event Bus
+  eventBus.publish('TIMETABLE_SESSION_ENDED', {
+    source: 'TIMETABLE_ENGINE',
+    classroom: session.classroom,
+    sessionId: session.id,
+    payload: {
+      session_id: session.id,
+      subject: session.subject,
+      classroom: session.classroom,
+      department: session.department,
+      present_count: finalStats.present_count,
+      absent_count: finalStats.absent_count,
+      attendance_percentage: finalStats.attendance_percentage,
+      absent_notifications_generated: absenceResult.generated,
+    },
+  });
+
+  if (absenceResult.generated > 0) {
+    eventBus.publish('ABSENCE_NOTIFICATION', {
+      source: 'ABSENCE_DISPATCHER',
+      classroom: session.classroom,
+      sessionId: session.id,
+      payload: {
+        session_id: session.id,
+        count: absenceResult.generated,
+        notifications: absenceResult.notifications,
+      },
+    });
+
+    db.logAudit({
+      action: 'NOTIFICATION_SENT',
+      performed_by: user.username,
+      target_type: 'SESSION_NOTIFICATIONS',
+      target_id: session.id,
+      details: `Generated and queued/dispatched ${absenceResult.generated} absence notifications for ${session.subject} (${session.classroom})`,
+    });
+  }
+
   res.json({
     success: true,
     message: 'Attendance session concluded successfully.',
     session,
     final_stats: finalStats,
+    absent_notifications: absenceResult,
   });
 });
 

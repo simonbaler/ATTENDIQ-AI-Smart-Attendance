@@ -33,6 +33,7 @@ import { DesktopWebRTCReceiver, WebRTCConnectionState } from '../services/webrtc
 import { SensorIntelligenceModal } from './SensorIntelligenceModal';
 import { ObservabilityDiagnosticsModal } from './ObservabilityDiagnosticsModal';
 import { LiveFaceGrid } from './LiveFaceGrid';
+import { objectAndMotionTracker, DetectedObject, MotionTrack } from '../services/objectAndMotionEngine';
 
 interface CameraViewProps {
   user?: User | null;
@@ -96,6 +97,9 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
   const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
   const [showSensorModal, setShowSensorModal] = useState<boolean>(false);
   const [showObservabilityModal, setShowObservabilityModal] = useState<boolean>(false);
+  const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
+  const [activeMotionTracks, setActiveMotionTracks] = useState<MotionTrack[]>([]);
+  const [showVisionTelemetry, setShowVisionTelemetry] = useState<boolean>(true);
 
   // Countdown timer for pairing token expiration
   useEffect(() => {
@@ -433,13 +437,86 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
     reader.readAsDataURL(file);
   };
 
-  // Draw Bounding Boxes Helper
-  const drawBoxesOnCanvas = (canvas: HTMLCanvasElement, results: RecognitionBox[]) => {
+  // Draw Bounding Boxes, Detected Objects, and Movement Vectors
+  const drawBoxesOnCanvas = (
+    canvas: HTMLCanvasElement,
+    results: RecognitionBox[],
+    objects: DetectedObject[] = [],
+    tracks: MotionTrack[] = []
+  ) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // 1. Draw Classroom Objects (Separate from Biometrics)
+    objects.forEach((obj) => {
+      ctx.save();
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = '#F59E0B'; // Amber dashed
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.08)';
+      ctx.beginPath();
+      ctx.roundRect(obj.box.x, obj.box.y, obj.box.width, obj.box.height, 6);
+      ctx.stroke();
+      ctx.fill();
+      ctx.setLineDash([]);
+
+      const objTagW = Math.max(160, obj.box.width);
+      const tagH = 26;
+      const tagY = Math.max(0, obj.box.y - tagH - 2);
+
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.roundRect(obj.box.x, tagY, objTagW, tagH, 4);
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#F59E0B';
+      ctx.stroke();
+
+      ctx.fillStyle = '#FCD34D';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(obj.label, obj.box.x + 6, tagY + 12);
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '9px sans-serif';
+      ctx.fillText('AI-estimated classroom object', obj.box.x + 6, tagY + 22);
+      ctx.restore();
+    });
+
+    // 2. Draw Movement Vectors and Objective Motion Trails
+    tracks.forEach((track) => {
+      if (track.velocity_px_sec > 15 && track.movement_vector) {
+        ctx.save();
+        ctx.strokeStyle = '#06B6D4'; // Cyan tracking vector
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(track.last_center.x, track.last_center.y);
+        ctx.lineTo(
+          track.last_center.x + track.movement_vector.dx * 1.5,
+          track.last_center.y + track.movement_vector.dy * 1.5
+        );
+        ctx.stroke();
+
+        // Direction & Velocity badge at bottom of person box
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.beginPath();
+        ctx.roundRect(track.box.x, track.box.y + track.box.height + 4, 210, 22, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#0284C7';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#38BDF8';
+        ctx.font = 'bold 9px monospace';
+        ctx.fillText(
+          `${track.track_id} • ${track.direction} (${track.velocity_px_sec} px/s)`,
+          track.box.x + 6,
+          track.box.y + track.box.height + 18
+        );
+        ctx.restore();
+      }
+    });
+
+    // 3. Draw Biometric Face Recognition Bounding Boxes
     results.forEach((faceResult: RecognitionBox) => {
       const {
         x,
@@ -457,6 +534,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
         duplicateIgnored,
         quality_valid,
         quality_rejection,
+        visual_signals,
       } = faceResult;
 
       const box = { x, y, width, height };
@@ -486,8 +564,8 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
       ctx.fill();
 
       // Header Tag Box
-      const tagWidth = Math.max(box.width, 240);
-      const labelHeight = 52;
+      const tagWidth = Math.max(box.width, 250);
+      const labelHeight = 54;
       const labelY = Math.max(0, box.y - labelHeight - 4);
 
       ctx.fillStyle = isSpoof ? '#450A0A' : isRecognized ? '#0F172A' : '#1E293B';
@@ -526,7 +604,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
         ctx.fillText('SPOOF PRESENTATION FLAGGED', box.x + 8, labelY + 36);
         ctx.font = '10px sans-serif';
         ctx.fillStyle = '#FECACA';
-        ctx.fillText('Photo/Screen presentation blocked', box.x + 8, labelY + 47);
+        ctx.fillText('Photo/Screen presentation blocked', box.x + 8, labelY + 48);
       } else if (isRecognized) {
         const deptCode = (student.department || '')
           .replace('Computer Science & Engineering', 'CSE')
@@ -539,7 +617,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
         ctx.fillText(`${student.full_name}`, box.x + 8, labelY + 36);
         ctx.font = '10px monospace';
         ctx.fillStyle = '#94A3B8';
-        ctx.fillText(`${student.roll_number} [${deptCode}] • ${confidence}%`, box.x + 8, labelY + 47);
+        ctx.fillText(`${student.roll_number} [${deptCode}] • ${confidence}%`, box.x + 8, labelY + 48);
 
         if (isConfirmed || duplicateIgnored) {
           ctx.fillStyle = '#10B981';
@@ -559,7 +637,22 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
         ctx.fillText('UNKNOWN PERSON', box.x + 8, labelY + 36);
         ctx.font = '10px sans-serif';
         ctx.fillStyle = '#94A3B8';
-        ctx.fillText(quality_valid ? 'No student match • Ignored' : (quality_rejection || 'Low quality'), box.x + 8, labelY + 47);
+        ctx.fillText(quality_valid ? 'No student match • Ignored' : (quality_rejection || 'Low quality'), box.x + 8, labelY + 48);
+      }
+
+      // 4. Render Objective Visual Signals Tag (Explainable AI telemetry)
+      if (visual_signals && visual_signals.face_direction) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        const sigTagW = Math.max(box.width, 240);
+        ctx.beginPath();
+        ctx.roundRect(box.x, box.y + box.height - 24, sigTagW, 22, 4);
+        ctx.fill();
+        ctx.fillStyle = '#A7F3D0';
+        ctx.font = '9px monospace';
+        const poseText = `Visual signal: ${visual_signals.face_direction} (Yaw ${visual_signals.head_pose?.yaw || 0}°)`;
+        ctx.fillText(poseText, box.x + 6, box.y + box.height - 9);
+        ctx.restore();
       }
     });
   };
@@ -609,12 +702,27 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
           lastFrameTimeRef.current = now;
 
           if (detected.length > 0) {
+            const tracks = objectAndMotionTracker.updateTracks(
+              detected.map((d) => ({ box: d.box })),
+              canvas.width,
+              'WEB_CAMERA'
+            );
+            setActiveMotionTracks([...tracks]);
+
+            const objs = objectAndMotionTracker.detectClassroomObjects(
+              canvas,
+              detected.map((d, idx) => ({ ...d.box, tracking_id: tracks[idx]?.track_id })),
+              activeSession?.classroom || 'Campus Vision'
+            );
+            setDetectedObjects(objs);
+
             const payload = {
               session_id: activeSession?.id,
               faces: detected.map((d) => ({
                 descriptor: d.descriptor,
                 box: d.box,
                 detectionScore: d.score,
+                visual_signals: d.visual_signals || null,
               })),
             };
 
@@ -622,7 +730,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
 
             if (recRes.success && recRes.results) {
               setDetectedFaces(recRes.results);
-              drawBoxesOnCanvas(canvas, recRes.results);
+              drawBoxesOnCanvas(canvas, recRes.results, objs, tracks);
 
               recRes.results.forEach((fr: any) => {
                 if (fr.attendanceMarked && fr.student) {
@@ -644,6 +752,8 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
             }
           } else {
             setDetectedFaces([]);
+            setDetectedObjects([]);
+            setActiveMotionTracks([]);
             const ctx = canvas.getContext('2d');
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
           }
@@ -718,12 +828,27 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
           lastRemoteFrameTimeRef.current = now;
 
           if (detected.length > 0) {
+            const tracks = objectAndMotionTracker.updateTracks(
+              detected.map((d) => ({ box: d.box })),
+              canvas.width,
+              'MOBILE_PHONE_CAMERA'
+            );
+            setActiveMotionTracks([...tracks]);
+
+            const objs = objectAndMotionTracker.detectClassroomObjects(
+              canvas,
+              detected.map((d, idx) => ({ ...d.box, tracking_id: tracks[idx]?.track_id })),
+              activeSession?.classroom || 'Campus Vision (Mobile)'
+            );
+            setDetectedObjects(objs);
+
             const payload = {
               session_id: activeSession?.id,
               faces: detected.map((d) => ({
                 descriptor: d.descriptor,
                 box: d.box,
                 detectionScore: d.score,
+                visual_signals: d.visual_signals || null,
               })),
             };
 
@@ -731,7 +856,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
 
             if (recRes.success && recRes.results) {
               setDetectedFaces(recRes.results);
-              drawBoxesOnCanvas(canvas, recRes.results);
+              drawBoxesOnCanvas(canvas, recRes.results, objs, tracks);
 
               recRes.results.forEach((fr: any) => {
                 if (fr.attendanceMarked && fr.student) {
@@ -753,6 +878,8 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
             }
           } else {
             setDetectedFaces([]);
+            setDetectedObjects([]);
+            setActiveMotionTracks([]);
             const ctx = canvas.getContext('2d');
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
           }
@@ -1081,6 +1208,107 @@ export const CameraView: React.FC<CameraViewProps> = ({ user, onSessionChange })
               className="hidden"
               onChange={handlePhotoUpload}
             />
+          </div>
+
+          {/* Classroom Vision, Object Detection & Movement Intelligence Panel */}
+          <div className="apple-card p-4 bg-white border border-gray-200 text-xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center space-x-2">
+                <Radio className="w-4 h-4 text-indigo-600 animate-pulse" />
+                <h3 className="font-bold text-gray-900 uppercase tracking-wider text-[11px]">
+                  Classroom Vision & Spatial Movement Intelligence
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowVisionTelemetry(!showVisionTelemetry)}
+                className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 underline"
+              >
+                {showVisionTelemetry ? 'Minimize' : 'Expand'}
+              </button>
+            </div>
+
+            {showVisionTelemetry && (
+              <div className="space-y-3">
+                {/* 1. Detected Classroom Objects */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-gray-700 font-semibold">
+                    <span>Observed Classroom Objects:</span>
+                    <span className="font-mono text-gray-500">{detectedObjects.length} in frame</span>
+                  </div>
+                  {detectedObjects.length === 0 ? (
+                    <div className="p-2.5 rounded bg-gray-50 border border-gray-100 text-gray-400 text-[11px] italic">
+                      No desk devices or items identified in current frame. Desk energy baseline nominal.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {detectedObjects.map((obj) => (
+                        <div
+                          key={obj.id}
+                          className="p-2 rounded bg-amber-50/60 border border-amber-200 flex items-center justify-between"
+                        >
+                          <div>
+                            <div className="font-bold text-amber-900 uppercase text-[11px]">{obj.type}</div>
+                            <div className="text-[10px] text-amber-700/80">AI-estimated classroom object</div>
+                          </div>
+                          <span className="px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 font-mono text-[10px] font-bold text-amber-900">
+                            {obj.confidence}% conf
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Spatial Tracking & Movement Trajectory */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-gray-700 font-semibold">
+                    <span>Multi-Person Movement & Directional Signals:</span>
+                    <span className="font-mono text-gray-500">{activeMotionTracks.length} active tracks</span>
+                  </div>
+                  {activeMotionTracks.length === 0 ? (
+                    <div className="p-2.5 rounded bg-gray-50 border border-gray-100 text-gray-400 text-[11px] italic">
+                      No multi-person movement vectors detected. Persons in frame are stationary.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {activeMotionTracks.map((track) => (
+                        <div
+                          key={track.track_id}
+                          className="p-2 rounded bg-sky-50/70 border border-sky-200 flex items-center justify-between text-[11px]"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono font-bold text-sky-900 bg-sky-100 px-1.5 py-0.5 rounded border border-sky-300">
+                                {track.track_id}
+                              </span>
+                              {track.student_name && (
+                                <span className="font-semibold text-gray-800">{track.student_name}</span>
+                              )}
+                              <span className="px-1.5 py-0.2 rounded bg-white text-gray-600 border border-gray-200 text-[10px]">
+                                {track.direction}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-sky-800 font-mono">
+                              AI-estimated visual signal: {track.objective_signal || `${track.direction} at ${track.velocity_px_sec} px/s`}
+                            </div>
+                          </div>
+                          <div className="text-right font-mono text-[10px] text-gray-500">
+                            <div>{track.velocity_px_sec} px/s</div>
+                            <div>{track.visibility_duration_sec}s in frame</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Objective Visual Signals & Explainable Telemetry Notice */}
+                <div className="p-2 rounded bg-slate-50 border border-slate-200 text-[10px] text-slate-600">
+                  <span className="font-bold text-slate-800">Compliance & Objectivity Notice: </span>
+                  All movement and facial orientation indicators represent objectively observable spatial metrics (head yaw, pitch, sector displacement) strictly labeled as <em>"AI-estimated visual signal"</em>.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* AI Recognition Engine Rules Notice */}

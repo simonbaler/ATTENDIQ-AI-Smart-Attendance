@@ -523,6 +523,16 @@ export interface RecognitionBox {
   spoofDetected?: boolean;
   crop_data_url?: string;
   camera_source?: 'WEB_CAMERA' | 'MOBILE_CAMERA';
+  visual_signals?: {
+    face_direction: string;
+    head_pose: { yaw: number; pitch: number; roll: number };
+    eye_aspect_ratio: number;
+    mouth_open_ratio: number;
+    gaze_estimate: string;
+    objective_statement: string;
+    signal_label: 'AI-estimated visual signal';
+  } | null;
+  motion_track?: any;
 }
 
 export interface LiveActivityEvent {

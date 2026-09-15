@@ -305,6 +305,7 @@ router.post('/process-recognition', authenticateToken, (req, res) => {
         descriptor: number[];
         box: { x: number; y: number; width: number; height: number };
         detectionScore?: number;
+        visual_signals?: any;
       }>;
     };
 
@@ -505,6 +506,7 @@ router.post('/process-recognition', authenticateToken, (req, res) => {
         requiredFrames,
         attendanceMarked,
         duplicateIgnored,
+        visual_signals: face.visual_signals || null,
       });
     }
 
