@@ -18,6 +18,9 @@ import {
   ArrowRight,
   ShieldCheck,
   Award,
+  ListFilter,
+  MapPin,
+  Radio,
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -37,8 +40,15 @@ interface IntelligenceViewProps {
 export const IntelligenceView: React.FC<IntelligenceViewProps> = ({ departments = [] }) => {
   const { user, isAdmin } = useAuth();
 
-  const [activeSubTab, setActiveSubTab] = useState<'insights' | 'anomalies' | 'risk' | 'health'>('insights');
+  const [activeSubTab, setActiveSubTab] = useState<'insights' | 'anomalies' | 'risk' | 'health' | 'timeline'>('insights');
   const [loading, setLoading] = useState(false);
+
+  // Timeline states (Phase 41+ Global Campus Activity Timeline)
+  const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
+  const [timelineClassroom, setTimelineClassroom] = useState<string>('ALL');
+  const [timelineEventType, setTimelineEventType] = useState<string>('ALL');
+  const [timelineSeverity, setTimelineSeverity] = useState<string>('ALL');
+  const [timelineLoading, setTimelineLoading] = useState<boolean>(false);
 
   // Data states
   const [insights, setInsights] = useState<AiInsight[]>([]);
@@ -105,6 +115,31 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({ departments 
   useEffect(() => {
     loadIntelligenceData();
   }, [selectedDept, anomalySeverity, anomalyResolved, riskFilter]);
+
+  const fetchTimeline = async () => {
+    setTimelineLoading(true);
+    try {
+      const res = await api.getGlobalTimeline({
+        classroom: timelineClassroom === 'ALL' ? undefined : timelineClassroom,
+        event_type: timelineEventType === 'ALL' ? undefined : timelineEventType,
+        severity: timelineSeverity === 'ALL' ? undefined : timelineSeverity,
+        limit: 50,
+      });
+      if (res.success) {
+        setTimelineEvents(res.timeline || []);
+      }
+    } catch (e) {
+      console.error('Failed to load global timeline:', e);
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'timeline') {
+      fetchTimeline();
+    }
+  }, [activeSubTab, timelineClassroom, timelineEventType, timelineSeverity]);
 
   // Handle manual generation of insights
   const handleRegenerateInsights = async () => {
@@ -300,6 +335,18 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({ departments 
         >
           <Activity className="w-4 h-4" />
           <span>System Health & Biometrics</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('timeline')}
+          className={`px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-2 ${
+            activeSubTab === 'timeline'
+              ? 'bg-blue-600 text-white shadow'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Global Campus Activity Timeline</span>
         </button>
       </div>
 
@@ -748,6 +795,182 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({ departments 
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub Tab 5: Global Campus Activity Timeline (Phase 41+) */}
+      {activeSubTab === 'timeline' && (
+        <div className="space-y-4">
+          {/* Filter Bar */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center space-x-1.5 text-slate-400">
+                <Filter className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="font-semibold text-slate-300">Filters:</span>
+              </div>
+
+              {/* Classroom filter */}
+              <select
+                value={timelineClassroom}
+                onChange={(e) => setTimelineClassroom(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-hidden focus:border-indigo-500"
+              >
+                <option value="ALL">All Classrooms</option>
+                <option value="LH-101">LH-101 (Lecture Hall)</option>
+                <option value="LH-102">LH-102 (Lecture Hall)</option>
+                <option value="C-201">C-201 (Classroom)</option>
+                <option value="C-204">C-204 (Classroom)</option>
+                <option value="LAB-1">LAB-1 (Computer Lab)</option>
+                <option value="LAB-2">LAB-2 (IoT Lab)</option>
+                <option value="AUD-01">AUD-01 (Auditorium)</option>
+              </select>
+
+              {/* Event Type filter */}
+              <select
+                value={timelineEventType}
+                onChange={(e) => setTimelineEventType(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-hidden focus:border-indigo-500"
+              >
+                <option value="ALL">All Event Types</option>
+                <option value="ATTENDANCE_RECORDED">Attendance Recorded</option>
+                <option value="FACE_RECOGNIZED">Face Recognized</option>
+                <option value="SESSION_STARTED">Session Started</option>
+                <option value="SESSION_STOPPED">Session Ended</option>
+                <option value="DEVICE_HEARTBEAT">Device Heartbeat</option>
+                <option value="DEVICE_OFFLINE">Device Offline</option>
+                <option value="ANOMALY_DETECTED">Anomaly Detected</option>
+                <option value="SECURITY_ALERT">Security Alert</option>
+              </select>
+
+              {/* Severity filter */}
+              <select
+                value={timelineSeverity}
+                onChange={(e) => setTimelineSeverity(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-hidden focus:border-indigo-500"
+              >
+                <option value="ALL">All Severities</option>
+                <option value="INFO">Info</option>
+                <option value="WARNING">Warning</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </div>
+
+            <button
+              onClick={fetchTimeline}
+              disabled={timelineLoading}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-semibold transition flex items-center space-x-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${timelineLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh Feed</span>
+            </button>
+          </div>
+
+          {/* Timeline Stream */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2">
+                <Clock className="w-4 h-4 text-indigo-400" />
+                <h3 className="text-sm font-bold text-white">Authoritative Unified Campus Event Stream</h3>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                {timelineEvents.length} Events Aggregated
+              </span>
+            </div>
+
+            {timelineLoading && timelineEvents.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-xs">
+                <RefreshCw className="w-5 h-5 text-slate-600 animate-spin mx-auto mb-2" />
+                <span>Aggregating real-time campus events...</span>
+              </div>
+            ) : timelineEvents.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-xs space-y-1">
+                <CheckCircle className="w-5 h-5 text-slate-600 mx-auto mb-1" />
+                <p className="font-semibold text-slate-300">No events found matching current criteria</p>
+                <p className="text-[11px]">Real campus events will populate dynamically as attendance and sensors operate.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {timelineEvents.map((evt, idx) => {
+                  const isCritical = evt.severity === 'CRITICAL' || evt.event_type?.includes('SECURITY') || evt.event_type?.includes('ANOMALY');
+                  const isWarning = evt.severity === 'WARNING' || evt.event_type?.includes('OFFLINE');
+                  const isVerified = evt.event_type?.includes('ATTENDANCE') || evt.event_type?.includes('RECOGNIZED');
+
+                  return (
+                    <div
+                      key={evt.id || idx}
+                      className={`p-3.5 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                        isCritical
+                          ? 'bg-rose-950/20 border-rose-800/40 text-rose-200'
+                          : isWarning
+                          ? 'bg-amber-950/20 border-amber-800/40 text-amber-200'
+                          : isVerified
+                          ? 'bg-emerald-950/15 border-emerald-800/30 text-emerald-200'
+                          : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div
+                          className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${
+                            isCritical
+                              ? 'bg-rose-950/80 text-rose-400 border border-rose-700/50'
+                              : isWarning
+                              ? 'bg-amber-950/80 text-amber-400 border border-amber-700/50'
+                              : isVerified
+                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-700/50'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          }`}
+                        >
+                          {isCritical ? (
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          ) : isVerified ? (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : (
+                            <Activity className="w-3.5 h-3.5" />
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-bold text-white">{evt.event_type || 'SYSTEM_EVENT'}</span>
+                            {evt.classroom && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-950/60 text-indigo-300 border border-indigo-800/40">
+                                {evt.classroom}
+                              </span>
+                            )}
+                            {evt.severity && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  isCritical
+                                    ? 'bg-rose-900/60 text-rose-300'
+                                    : isWarning
+                                    ? 'bg-amber-900/60 text-amber-300'
+                                    : 'bg-slate-800 text-slate-400'
+                                }`}
+                              >
+                                {evt.severity}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-400 text-[11px] leading-relaxed">
+                            {evt.description || evt.message || JSON.stringify(evt.payload || evt.data || 'Event recorded')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right shrink-0">
+                        <span className="text-[11px] font-mono text-slate-400 block">
+                          {evt.timestamp ? new Date(evt.timestamp).toLocaleTimeString() : 'Recent'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          {evt.timestamp ? new Date(evt.timestamp).toLocaleDateString() : ''}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

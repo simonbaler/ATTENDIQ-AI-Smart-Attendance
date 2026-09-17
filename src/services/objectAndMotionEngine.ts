@@ -10,14 +10,21 @@ export type ClassroomObjectType =
 
 export interface DetectedObject {
   id: string;
+  object_id: string;
   type: ClassroomObjectType;
+  class: ClassroomObjectType;
   confidence: number;
   box: { x: number; y: number; width: number; height: number };
+  bounding_box: { x: number; y: number; width: number; height: number };
   timestamp: string;
   camera_source: string;
+  camera_id: string;
   classroom?: string;
+  classroom_id?: string;
   tracking_id?: string;
   label: string;
+  evidence_level: 'AI-ESTIMATED';
+  method: 'HEURISTIC_EDGE_GRADIENT';
 }
 
 export type MovementDirection =
@@ -282,21 +289,30 @@ class ObjectAndMotionTracker {
             const objW = Math.min(deskW * 0.85, 260);
             const objH = Math.max(objW * 0.58, 80);
             const conf = Math.min(96, Math.max(76, Math.round(74 + (avgEdge / 3))));
+            const boxObj = {
+              x: Math.round(deskX + (deskW - objW) / 2),
+              y: Math.round(deskY + deskH * 0.2),
+              width: Math.round(objW),
+              height: Math.round(objH),
+            };
+            const objId = `obj_laptop_${i}_${Date.now().toString(36)}`;
             objects.push({
-              id: `obj_laptop_${i}_${Date.now().toString(36)}`,
+              id: objId,
+              object_id: objId,
               type: 'laptop',
+              class: 'laptop',
               confidence: conf,
-              box: {
-                x: Math.round(deskX + (deskW - objW) / 2),
-                y: Math.round(deskY + deskH * 0.2),
-                width: Math.round(objW),
-                height: Math.round(objH),
-              },
+              box: boxObj,
+              bounding_box: boxObj,
               timestamp: nowStr,
               camera_source: 'CLASSROOM_VISION',
+              camera_id: 'CLASSROOM_VISION',
               classroom: classroomName,
+              classroom_id: classroomName,
               tracking_id: face.tracking_id,
               label: `LAPTOP (${conf}%)`,
+              evidence_level: 'AI-ESTIMATED',
+              method: 'HEURISTIC_EDGE_GRADIENT',
             });
           }
           // 2. Mobile Phone: Dominant vertical rectangular aspect ratio
@@ -304,21 +320,30 @@ class ObjectAndMotionTracker {
             const objW = Math.min(Math.max(face.width * 0.45, 45), 90);
             const objH = Math.round(objW * 1.95);
             const conf = Math.min(95, Math.max(75, Math.round(72 + (avgEdge / 2.8))));
+            const boxObj = {
+              x: Math.round(deskX + highEdgeX - objW / 2),
+              y: Math.round(deskY + highEdgeY - objH / 2),
+              width: Math.round(objW),
+              height: Math.round(objH),
+            };
+            const objId = `obj_phone_${i}_${Date.now().toString(36)}`;
             objects.push({
-              id: `obj_phone_${i}_${Date.now().toString(36)}`,
+              id: objId,
+              object_id: objId,
               type: 'mobile phone',
+              class: 'mobile phone',
               confidence: conf,
-              box: {
-                x: Math.round(deskX + highEdgeX - objW / 2),
-                y: Math.round(deskY + highEdgeY - objH / 2),
-                width: Math.round(objW),
-                height: Math.round(objH),
-              },
+              box: boxObj,
+              bounding_box: boxObj,
               timestamp: nowStr,
               camera_source: 'CLASSROOM_VISION',
+              camera_id: 'CLASSROOM_VISION',
               classroom: classroomName,
+              classroom_id: classroomName,
               tracking_id: face.tracking_id,
               label: `MOBILE PHONE (${conf}%)`,
+              evidence_level: 'AI-ESTIMATED',
+              method: 'HEURISTIC_EDGE_GRADIENT',
             });
           }
           // 3. Tablet: Aspect ratio ~ 4:3
@@ -326,21 +351,30 @@ class ObjectAndMotionTracker {
             const objW = Math.min(Math.max(face.width * 0.8, 80), 160);
             const objH = Math.round(objW * 0.75);
             const conf = Math.min(92, Math.max(72, Math.round(70 + (avgEdge / 3.1))));
+            const boxObj = {
+              x: Math.round(deskX + highEdgeX - objW / 2),
+              y: Math.round(deskY + highEdgeY - objH / 2),
+              width: Math.round(objW),
+              height: Math.round(objH),
+            };
+            const objId = `obj_tablet_${i}_${Date.now().toString(36)}`;
             objects.push({
-              id: `obj_tablet_${i}_${Date.now().toString(36)}`,
+              id: objId,
+              object_id: objId,
               type: 'tablet',
+              class: 'tablet',
               confidence: conf,
-              box: {
-                x: Math.round(deskX + highEdgeX - objW / 2),
-                y: Math.round(deskY + highEdgeY - objH / 2),
-                width: Math.round(objW),
-                height: Math.round(objH),
-              },
+              box: boxObj,
+              bounding_box: boxObj,
               timestamp: nowStr,
               camera_source: 'CLASSROOM_VISION',
+              camera_id: 'CLASSROOM_VISION',
               classroom: classroomName,
+              classroom_id: classroomName,
               tracking_id: face.tracking_id,
               label: `TABLET (${conf}%)`,
+              evidence_level: 'AI-ESTIMATED',
+              method: 'HEURISTIC_EDGE_GRADIENT',
             });
           }
           // 4. Bottle: Tall narrow vertical profile
@@ -348,21 +382,30 @@ class ObjectAndMotionTracker {
             const objW = Math.min(Math.max(face.width * 0.35, 30), 55);
             const objH = Math.round(objW * 2.8);
             const conf = Math.min(90, Math.max(70, Math.round(68 + (avgEdge / 3.5))));
+            const boxObj = {
+              x: Math.round(deskX + highEdgeX - objW / 2),
+              y: Math.round(deskY + highEdgeY - objH / 2),
+              width: Math.round(objW),
+              height: Math.round(objH),
+            };
+            const objId = `obj_bottle_${i}_${Date.now().toString(36)}`;
             objects.push({
-              id: `obj_bottle_${i}_${Date.now().toString(36)}`,
+              id: objId,
+              object_id: objId,
               type: 'bottle',
+              class: 'bottle',
               confidence: conf,
-              box: {
-                x: Math.round(deskX + highEdgeX - objW / 2),
-                y: Math.round(deskY + highEdgeY - objH / 2),
-                width: Math.round(objW),
-                height: Math.round(objH),
-              },
+              box: boxObj,
+              bounding_box: boxObj,
               timestamp: nowStr,
               camera_source: 'CLASSROOM_VISION',
+              camera_id: 'CLASSROOM_VISION',
               classroom: classroomName,
+              classroom_id: classroomName,
               tracking_id: face.tracking_id,
               label: `WATER BOTTLE (${conf}%)`,
+              evidence_level: 'AI-ESTIMATED',
+              method: 'HEURISTIC_EDGE_GRADIENT',
             });
           }
           // 5. Book / Notebook: Broad planar contrast area
@@ -370,21 +413,30 @@ class ObjectAndMotionTracker {
             const objW = Math.min(deskW * 0.7, 180);
             const objH = Math.round(objW * 0.72);
             const conf = Math.min(91, Math.max(70, Math.round(68 + (avgEdge / 3.2))));
+            const boxObj = {
+              x: Math.round(deskX + deskW * 0.15),
+              y: Math.round(deskY + deskH * 0.25),
+              width: Math.round(objW),
+              height: Math.round(objH),
+            };
+            const objId = `obj_book_${i}_${Date.now().toString(36)}`;
             objects.push({
-              id: `obj_book_${i}_${Date.now().toString(36)}`,
+              id: objId,
+              object_id: objId,
               type: 'book',
+              class: 'book',
               confidence: conf,
-              box: {
-                x: Math.round(deskX + deskW * 0.15),
-                y: Math.round(deskY + deskH * 0.25),
-                width: Math.round(objW),
-                height: Math.round(objH),
-              },
+              box: boxObj,
+              bounding_box: boxObj,
               timestamp: nowStr,
               camera_source: 'CLASSROOM_VISION',
+              camera_id: 'CLASSROOM_VISION',
               classroom: classroomName,
+              classroom_id: classroomName,
               tracking_id: face.tracking_id,
               label: `BOOK / NOTEBOOK (${conf}%)`,
+              evidence_level: 'AI-ESTIMATED',
+              method: 'HEURISTIC_EDGE_GRADIENT',
             });
           }
         }

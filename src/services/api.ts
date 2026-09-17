@@ -1370,4 +1370,137 @@ export const api = {
     });
     return res.json();
   },
+
+  // Campus Intelligence Orchestrator (Phase 41+)
+  async getOrchestratorState(): Promise<any> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/state`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getClassroomsIntelligence(): Promise<{ success: boolean; count: number; classrooms: any[] }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/classrooms`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getClassroomDetail(id: string): Promise<{ success: boolean; classroom: any }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/classrooms/${encodeURIComponent(id)}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getCameraRegistry(): Promise<{ success: boolean; count: number; cameras: any[] }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/cameras`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async reportCameraMetrics(metrics: {
+    camera_id: string;
+    measured_fps?: number;
+    connection_latency_ms?: number;
+    stream_state?: string;
+    resolution?: string;
+    source?: string;
+    classroom?: string;
+    name?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/cameras/report`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(metrics),
+    });
+    return res.json();
+  },
+
+  async getDeviceHealthRegistry(): Promise<{ success: boolean; count: number; devices: any[] }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/devices`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getGlobalTimeline(filter?: {
+    classroom?: string;
+    event_type?: string;
+    severity?: string;
+    limit?: number;
+  }): Promise<{ success: boolean; count: number; timeline: any[] }> {
+    const params = new URLSearchParams();
+    if (filter?.classroom) params.append('classroom', filter.classroom);
+    if (filter?.event_type) params.append('event_type', filter.event_type);
+    if (filter?.severity) params.append('severity', filter.severity);
+    if (filter?.limit) params.append('limit', String(filter.limit));
+
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/timeline?${params.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getAttendanceRisk(department?: string): Promise<{ success: boolean; count: number; assessments: any[] }> {
+    const q = department && department !== 'ALL' ? `?department=${encodeURIComponent(department)}` : '';
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/risk${q}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async askOperationalAi(query: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/query`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ query }),
+    });
+    return res.json();
+  },
+
+  async logStudentMovement(data: any): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/telemetry/movement`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async logDetectedObject(data: any): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/telemetry/object`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async deviceReboot(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/devices/${id}/reboot`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async deviceToggleRelay(id: string, channel: number, state: 'ON' | 'OFF'): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/devices/${id}/relay`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ channel, state }),
+    });
+    return res.json();
+  },
+
+  async devicePushDisplay(id: string, line1: string, line2: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/intelligence/orchestrator/devices/${id}/display`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ line1, line2 }),
+    });
+    return res.json();
+  },
 };

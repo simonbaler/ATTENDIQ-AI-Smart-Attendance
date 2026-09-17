@@ -24,6 +24,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { CampusDevice } from '../types';
+import { api } from '../services/api';
 
 interface DeviceDetailDrawerProps {
   device: CampusDevice | null;
@@ -48,9 +49,13 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
   networkInfo,
   liveEvents = [],
 }) => {
-  const [activeSection, setActiveSection] = useState<'overview' | 'connection' | 'telemetry' | 'services' | 'events' | 'classroom' | 'diagnostics'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'connection' | 'telemetry' | 'classroom' | 'diagnostics' | 'events' | 'commands'>('overview');
   const [pinging, setPinging] = useState(false);
   const [pingResult, setPingResult] = useState<string | null>(null);
+  const [relayState, setRelayState] = useState(false);
+  const [displayMsg, setDisplayMsg] = useState('ATTENDIQ ACTIVE');
+  const [commandLoading, setCommandLoading] = useState(false);
+  const [commandResult, setCommandResult] = useState<string | null>(null);
 
   if (!isOpen || !device) return null;
 
@@ -142,6 +147,7 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
           <div className="flex items-center space-x-1 px-4 py-2 bg-gray-50/50 border-b border-gray-100 overflow-x-auto scrollbar-none text-xs">
             {[
               { id: 'overview', label: 'Overview' },
+              { id: 'commands', label: 'Commands' },
               { id: 'connection', label: 'Connection' },
               { id: 'telemetry', label: 'Telemetry' },
               { id: 'classroom', label: 'Classroom' },
@@ -459,6 +465,135 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* 7. IOT COMMAND CENTER SECTION (Phase 41+) */}
+            {activeSection === 'commands' && (
+              <div className="space-y-4 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    Hardware Control Center
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    REAL-TIME COMMANDS
+                  </span>
+                </div>
+
+                {commandResult && (
+                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-medium flex items-center justify-between">
+                    <span>{commandResult}</span>
+                    <button onClick={() => setCommandResult(null)} className="text-blue-500 hover:text-blue-700 font-bold ml-2">
+                      &times;
+                    </button>
+                  </div>
+                )}
+
+                {/* Command 1: Reboot Device */}
+                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-2.5">
+                  <div className="flex items-center space-x-2">
+                    <RefreshCw className="w-4 h-4 text-amber-600" />
+                    <span className="font-bold text-gray-900">Device Hardware Reboot</span>
+                  </div>
+                  <p className="text-gray-600 text-[11px]">
+                    Sends authenticated reboot signal to device firmware watchdog over HTTP/WebSocket gateway.
+                  </p>
+                  <button
+                    disabled={commandLoading}
+                    onClick={async () => {
+                      setCommandLoading(true);
+                      setCommandResult(null);
+                      try {
+                        const res = await api.deviceReboot(device.id);
+                        setCommandResult(res.message || 'Reboot signal dispatched successfully.');
+                      } catch (err: any) {
+                        setCommandResult(`Failed to dispatch reboot: ${err.message}`);
+                      } finally {
+                        setCommandLoading(false);
+                      }
+                    }}
+                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-xs transition disabled:opacity-50"
+                  >
+                    {commandLoading ? 'Dispatching...' : 'Reboot Device'}
+                  </button>
+                </div>
+
+                {/* Command 2: Relay Switch Control */}
+                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-2.5">
+                  <div className="flex items-center space-x-2">
+                    <Zap className="w-4 h-4 text-emerald-600" />
+                    <span className="font-bold text-gray-900">Relay Power Switch (Door / Lights)</span>
+                  </div>
+                  <p className="text-gray-600 text-[11px]">
+                    Commands GPIO output pins on connected ESP32 relay controller.
+                  </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-gray-700 font-semibold">Relay Pin #1:</span>
+                    <button
+                      disabled={commandLoading}
+                      onClick={async () => {
+                        const nextState = !relayState;
+                        const stateStr: 'ON' | 'OFF' = nextState ? 'ON' : 'OFF';
+                        setCommandLoading(true);
+                        setCommandResult(null);
+                        try {
+                          const res = await api.deviceToggleRelay(device.id, 1, stateStr);
+                          setRelayState(nextState);
+                          setCommandResult(res.message || `Relay 1 toggled to ${stateStr}`);
+                        } catch (err: any) {
+                          setCommandResult(`Relay command failed: ${err.message}`);
+                        } finally {
+                          setCommandLoading(false);
+                        }
+                      }}
+                      className={`px-4 py-1.5 rounded-xl font-bold transition ${
+                        relayState
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {relayState ? 'OPEN / ON' : 'CLOSED / OFF'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Command 3: Display Push Message */}
+                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-2.5">
+                  <div className="flex items-center space-x-2">
+                    <Terminal className="w-4 h-4 text-blue-600" />
+                    <span className="font-bold text-gray-900">OLED / LCD Screen Push</span>
+                  </div>
+                  <p className="text-gray-600 text-[11px]">
+                    Renders instant text notification to classroom OLED or e-paper display unit.
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={displayMsg}
+                      onChange={(e) => setDisplayMsg(e.target.value)}
+                      placeholder="Enter classroom display message..."
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
+                    />
+                    <button
+                      disabled={commandLoading || !displayMsg.trim()}
+                      onClick={async () => {
+                        setCommandLoading(true);
+                        setCommandResult(null);
+                        try {
+                          const res = await api.devicePushDisplay(device.id, displayMsg.trim(), 'ATTENDIQ AI');
+                          setCommandResult(res.message || 'Display message transmitted.');
+                        } catch (err: any) {
+                          setCommandResult(`Display transmission error: ${err.message}`);
+                        } finally {
+                          setCommandLoading(false);
+                        }
+                      }}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition disabled:opacity-50"
+                    >
+                      {commandLoading ? 'Transmitting...' : 'Push to Device Display'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

@@ -85,6 +85,24 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     Inactive
                   </span>
                 )}
+                {profile && (() => {
+                  const pct = profile.attendance_percentage ?? 0;
+                  const cat: 'CRITICAL' | 'AT_RISK' | 'MODERATE' | 'SAFE' =
+                    pct < 65 ? 'CRITICAL' : pct < 75 ? 'AT_RISK' : pct < 85 ? 'MODERATE' : 'SAFE';
+                  const badgeStyle =
+                    cat === 'CRITICAL'
+                      ? 'bg-red-100 text-red-800 border-red-300'
+                      : cat === 'AT_RISK'
+                      ? 'bg-amber-100 text-amber-800 border-amber-300'
+                      : cat === 'MODERATE'
+                      ? 'bg-blue-100 text-blue-800 border-blue-300'
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                  return (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${badgeStyle}`}>
+                      {cat.replace('_', ' ')}
+                    </span>
+                  );
+                })()}
                 {profile && (profile.consecutive_absences ?? 0) >= 2 && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 flex items-center space-x-1">
                     <AlertTriangle className="w-3 h-3" />
@@ -202,7 +220,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               {activeTab === 'overview' && (
                 <div className="space-y-5">
                   {/* Time-Granular Attendance Progression */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                     <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-200/80">
                       <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Today's Attendance</div>
                       <div className="text-2xl font-bold mt-1 text-blue-600">
@@ -235,6 +253,25 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                         {profile.attendance_percentage}%
                       </div>
                       <div className="text-[10px] text-gray-500 mt-0.5">Benchmark: 75% minimum</div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-200/80 col-span-2 sm:col-span-1">
+                      <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Consistency Score</div>
+                      {(() => {
+                        const variance = Math.abs((profile.weekly_attendance ?? profile.attendance_percentage) - (profile.monthly_attendance ?? profile.attendance_percentage));
+                        const penalties = (profile.consecutive_absences ?? 0) * 8;
+                        const score = Math.max(10, Math.min(100, Math.round(100 - variance * 1.2 - penalties)));
+                        return (
+                          <>
+                            <div className={`text-2xl font-bold mt-1 ${score >= 80 ? 'text-purple-700' : score >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>
+                              {score}/100
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-0.5">
+                              {score >= 80 ? 'Highly Reliable' : score >= 60 ? 'Moderate Variance' : 'High Volatility'}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 

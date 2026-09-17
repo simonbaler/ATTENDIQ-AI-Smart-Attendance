@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server as HttpServer } from 'http';
 import { db, CampusDevice, DeviceTelemetry, DeviceStatus } from './db.js';
+import { eventBus } from './eventBus.js';
 
 export interface DeviceEventLog {
   id: string;
@@ -464,6 +465,16 @@ function handleHardwareMessage(ws: WebSocket, client: HardwareClient, message: a
       if (recordRes.success && recordRes.device) {
         notifyDeviceTelemetry(recordRes.device, recordRes.device.telemetry!);
 
+        eventBus.publish('TELEMETRY_LOGGED', {
+          source: 'IOT_GATEWAY',
+          classroom: recordRes.device.classroom,
+          payload: {
+            device_id: recordRes.device.id,
+            name: recordRes.device.name,
+            telemetry: sensorData,
+          },
+        });
+
         ws.send(JSON.stringify({
           type: 'TELEMETRY_ACK',
           device_id: targetDeviceId,
@@ -493,6 +504,17 @@ function handleHardwareMessage(ws: WebSocket, client: HardwareClient, message: a
       const dev = db.getCampusDeviceById(targetDeviceId);
       db.updateDeviceHeartbeat(targetDeviceId, 'ONLINE');
       notifyDeviceStatus(targetDeviceId, 'ONLINE', client.classroom, dev?.department);
+
+      eventBus.publish('DEVICE_HEARTBEAT', {
+        source: 'IOT_GATEWAY',
+        classroom: client.classroom || dev?.classroom,
+        payload: {
+          device_id: targetDeviceId,
+          name: dev?.name || targetDeviceId,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
       recordDeviceEvent({
         type: 'DEVICE_HEARTBEAT',
         device_id: targetDeviceId,

@@ -111,7 +111,17 @@ export const CampusDigitalTwin3D: React.FC<CampusDigitalTwin3DProps> = ({
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [selectedClassroom, setSelectedClassroom] = useState<string | null>(null);
 
+  // Layer Toggle Bar States (Phase 41+ Digital Twin 2.0)
+  const [layers, setLayers] = useState({
+    cameras: true,
+    iot: true,
+    occupancy: true,
+    network: true,
+  });
+
   // Real backend data states
+  const [classroomsState, setClassroomsState] = useState<any[]>([]);
+  const [deviceHealthList, setDeviceHealthList] = useState<any[]>([]);
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [activeSession, setActiveSession] = useState<AttendanceSession | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
@@ -124,12 +134,14 @@ export const CampusDigitalTwin3D: React.FC<CampusDigitalTwin3DProps> = ({
   const loadCampusState = async () => {
     try {
       setLoading(true);
-      const [sessRes, actRes, studRes, devRes, camRes] = await Promise.all([
+      const [sessRes, actRes, studRes, devRes, camRes, cStateRes, dHealthRes] = await Promise.all([
         api.getSessions(),
         api.getActiveSession(),
         api.getStudents(),
         api.getCampusDevices(),
         api.getCameras(),
+        api.getClassroomsIntelligence().catch(() => ({ success: false, classrooms: [] })),
+        api.getDeviceHealthRegistry().catch(() => ({ success: false, devices: [] })),
       ]);
 
       if (sessRes.success && sessRes.sessions) setSessions(sessRes.sessions);
@@ -137,6 +149,8 @@ export const CampusDigitalTwin3D: React.FC<CampusDigitalTwin3DProps> = ({
       if (studRes.success && studRes.students) setStudents(studRes.students);
       if (devRes.success && devRes.devices) setDevices(devRes.devices);
       if (camRes.success && camRes.cameras) setCameras(camRes.cameras);
+      if (cStateRes.success && cStateRes.classrooms) setClassroomsState(cStateRes.classrooms);
+      if (dHealthRes.success && dHealthRes.devices) setDeviceHealthList(dHealthRes.devices);
     } catch (err) {
       console.error('Failed to load campus twin telemetry:', err);
     } finally {
@@ -283,6 +297,56 @@ export const CampusDigitalTwin3D: React.FC<CampusDigitalTwin3DProps> = ({
       beacon.position.y = bldg.height + 0.55;
       bldgGroup.add(beacon);
 
+      // Layer 1: Occupancy Heatmap Glow Ring
+      if (layers.occupancy && activeSession && bldg.classrooms.includes(activeSession.classroom)) {
+        const ringGeo = new THREE.RingGeometry(1.5, 1.8, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0x10b981,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.6,
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.05;
+        bldgGroup.add(ring);
+      }
+
+      // Layer 2: Cameras Marker
+      if (layers.cameras) {
+        const camMarkerGeo = new THREE.OctahedronGeometry(0.16);
+        const camMarkerMat = new THREE.MeshStandardMaterial({
+          color: 0x0ea5e9,
+          roughness: 0.2,
+          metalness: 0.8,
+        });
+        const camMarker = new THREE.Mesh(camMarkerGeo, camMarkerMat);
+        camMarker.position.set(-0.7, bldg.height + 0.5, 0.4);
+        bldgGroup.add(camMarker);
+      }
+
+      // Layer 3: IoT Devices Node
+      if (layers.iot) {
+        const iotGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+        const iotMat = new THREE.MeshStandardMaterial({
+          color: 0x8b5cf6,
+          roughness: 0.3,
+          metalness: 0.6,
+        });
+        const iotMesh = new THREE.Mesh(iotGeo, iotMat);
+        iotMesh.position.set(0.7, bldg.height + 0.5, -0.4);
+        bldgGroup.add(iotMesh);
+      }
+
+      // Layer 4: Network Health Ping
+      if (layers.network) {
+        const netGeo = new THREE.SphereGeometry(0.08, 12, 12);
+        const netMat = new THREE.MeshBasicMaterial({ color: 0x22c55e });
+        const netMesh = new THREE.Mesh(netGeo, netMat);
+        netMesh.position.set(0, bldg.height + 0.75, 0);
+        bldgGroup.add(netMesh);
+      }
+
       buildingsGroup.add(bldgGroup);
     });
 
@@ -357,7 +421,7 @@ export const CampusDigitalTwin3D: React.FC<CampusDigitalTwin3DProps> = ({
         container.removeChild(renderer.domElement);
       }
     };
-  }, [selectedBuilding, activeSession]);
+  }, [selectedBuilding, activeSession, layers]);
 
   // Derived telemetry for current selection
   const classroomSession = activeSession && activeSession.classroom.toLowerCase() === selectedClassroom?.toLowerCase()
@@ -467,6 +531,59 @@ export const CampusDigitalTwin3D: React.FC<CampusDigitalTwin3DProps> = ({
                 </span>
               </>
             )}
+          </div>
+
+          {/* Layer Toggle Bar (Phase 41+ Digital Twin 2.0) */}
+          <div className="px-5 py-2.5 bg-white border-b border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="font-bold text-gray-500 uppercase tracking-wider text-[10px]">
+              Spatial Layers:
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => setLayers((prev) => ({ ...prev, cameras: !prev.cameras }))}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+                  layers.cameras
+                    ? 'bg-sky-100 text-sky-800 border border-sky-300 shadow-sm'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Cameras</span>
+              </button>
+              <button
+                onClick={() => setLayers((prev) => ({ ...prev, iot: !prev.iot }))}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+                  layers.iot
+                    ? 'bg-purple-100 text-purple-800 border border-purple-300 shadow-sm'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                <Cpu className="w-3.5 h-3.5" />
+                <span>IoT Devices</span>
+              </button>
+              <button
+                onClick={() => setLayers((prev) => ({ ...prev, occupancy: !prev.occupancy }))}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+                  layers.occupancy
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Occupancy Heatmap</span>
+              </button>
+              <button
+                onClick={() => setLayers((prev) => ({ ...prev, network: !prev.network }))}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+                  layers.network
+                    ? 'bg-green-100 text-green-800 border border-green-300 shadow-sm'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                <Wifi className="w-3.5 h-3.5" />
+                <span>Network Health</span>
+              </button>
+            </div>
           </div>
 
           {/* Three.js Container */}
@@ -629,73 +746,130 @@ export const CampusDigitalTwin3D: React.FC<CampusDigitalTwin3DProps> = ({
                 </div>
               </div>
 
-              {/* Deep Classroom Telemetry Card */}
-              {selectedClassroom && (
-                <div className="pt-3 border-t border-gray-100 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-bold text-gray-900 font-mono flex items-center space-x-1.5">
-                      <span>Room {selectedClassroom}</span>
-                      {classroomSession ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Active Class
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">
-                          No Active Class
-                        </span>
+                  {/* Deep Classroom Telemetry Card */}
+              {selectedClassroom && (() => {
+                const currentIntel = classroomsState.find(
+                  (c) => c.classroom_id?.toLowerCase() === selectedClassroom.toLowerCase()
+                );
+                const turnoutPct = classroomSession?.attendance_percentage ?? 0;
+                const env = currentIntel?.telemetry;
+
+                return (
+                  <div className="pt-3 border-t border-gray-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-gray-900 font-mono flex items-center space-x-1.5">
+                        <span>Room {selectedClassroom}</span>
+                        {classroomSession || currentIntel?.has_active_session ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Active Class
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">
+                            No Active Class
+                          </span>
+                        )}
+                      </div>
+
+                      {(classroomSession || currentIntel?.has_active_session) && (
+                        <button
+                          onClick={() => onOpenLiveCamera?.(selectedClassroom)}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center space-x-1"
+                        >
+                          <Video className="w-3.5 h-3.5" />
+                          <span>View Camera</span>
+                        </button>
                       )}
                     </div>
 
-                    {classroomSession && (
-                      <button
-                        onClick={() => onOpenLiveCamera?.(selectedClassroom)}
-                        className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center space-x-1"
-                      >
-                        <Video className="w-3.5 h-3.5" />
-                        <span>View Camera</span>
-                      </button>
+                    {/* Class Info Box */}
+                    <div className="bg-gray-50 rounded-2xl p-3 border border-gray-200/80 space-y-2">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 uppercase">Subject</div>
+                          <div className="font-bold text-gray-900 truncate">
+                            {classroomSession?.subject || currentIntel?.current_subject || 'Free / Unscheduled'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 uppercase">Faculty</div>
+                          <div className="font-bold text-gray-900 truncate">
+                            {classroomSession?.faculty || currentIntel?.faculty_name || 'Not Assigned'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Verified Attendance Metrics & Turnout Gauge */}
+                      <div className="pt-2 border-t border-gray-200/60 space-y-2">
+                        <div className="grid grid-cols-3 gap-1.5 text-center">
+                          <div className="bg-white p-2 rounded-xl border border-gray-100">
+                            <div className="text-[10px] font-bold text-gray-500 uppercase">Roster</div>
+                            <div className="text-base font-bold text-gray-900">
+                              {classroomSession?.total_students || classroomStudents.length || 0}
+                            </div>
+                          </div>
+                          <div className="bg-white p-2 rounded-xl border border-gray-100">
+                            <div className="text-[10px] font-bold text-emerald-700 uppercase">Present</div>
+                            <div className="text-base font-bold text-emerald-600">
+                              {classroomSession?.present_count || currentIntel?.verified_attendance_count || 0}
+                            </div>
+                          </div>
+                          <div className="bg-white p-2 rounded-xl border border-gray-100">
+                            <div className="text-[10px] font-bold text-blue-700 uppercase">Turnout</div>
+                            <div className="text-base font-bold text-blue-600">
+                              {turnoutPct}%
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Turnout Gauge Bar */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[10px] font-bold text-gray-500">
+                            <span>Attendance Compliance</span>
+                            <span className={turnoutPct >= 75 ? 'text-emerald-600' : turnoutPct >= 50 ? 'text-amber-600' : 'text-rose-600'}>
+                              {turnoutPct}% (Threshold: 75%)
+                            </span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-gray-200 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                turnoutPct >= 75 ? 'bg-emerald-500' : turnoutPct >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(0, turnoutPct))}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Environmental Telemetry from IoT */}
+                    {env && (
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1 text-xs">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                          <span>IoT Environmental Telemetry</span>
+                          <span className="text-[9px] text-emerald-600 font-mono font-bold">REAL-TIME</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 text-center font-mono">
+                          {env.temperature_c !== undefined && (
+                            <div className="bg-white p-1 rounded border border-slate-100">
+                              <span className="text-[9px] text-gray-400 block">TEMP</span>
+                              <span className="font-bold text-gray-800">{env.temperature_c}°C</span>
+                            </div>
+                          )}
+                          {env.humidity_pct !== undefined && (
+                            <div className="bg-white p-1 rounded border border-slate-100">
+                              <span className="text-[9px] text-gray-400 block">HUMIDITY</span>
+                              <span className="font-bold text-gray-800">{env.humidity_pct}%</span>
+                            </div>
+                          )}
+                          {env.co2_ppm !== undefined && (
+                            <div className="bg-white p-1 rounded border border-slate-100">
+                              <span className="text-[9px] text-gray-400 block">CO2</span>
+                              <span className="font-bold text-gray-800">{env.co2_ppm} ppm</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
-                  </div>
-
-                  {/* Class Info Box */}
-                  <div className="bg-gray-50 rounded-2xl p-3 border border-gray-200/80 space-y-2">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <div className="text-[10px] font-bold text-gray-500 uppercase">Subject</div>
-                        <div className="font-bold text-gray-900 truncate">
-                          {classroomSession?.subject || 'Free / Unscheduled'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] font-bold text-gray-500 uppercase">Faculty</div>
-                        <div className="font-bold text-gray-900 truncate">
-                          {classroomSession?.faculty || 'Not Assigned'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Verified Attendance Metrics */}
-                    <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-gray-200/60 text-center">
-                      <div className="bg-white p-2 rounded-xl border border-gray-100">
-                        <div className="text-[10px] font-bold text-gray-500 uppercase">Roster</div>
-                        <div className="text-base font-bold text-gray-900">
-                          {classroomSession?.total_students || classroomStudents.length || 0}
-                        </div>
-                      </div>
-                      <div className="bg-white p-2 rounded-xl border border-gray-100">
-                        <div className="text-[10px] font-bold text-emerald-700 uppercase">Present</div>
-                        <div className="text-base font-bold text-emerald-600">
-                          {classroomSession?.present_count || 0}
-                        </div>
-                      </div>
-                      <div className="bg-white p-2 rounded-xl border border-gray-100">
-                        <div className="text-[10px] font-bold text-blue-700 uppercase">Turnout</div>
-                        <div className="text-base font-bold text-blue-600">
-                          {classroomSession?.attendance_percentage || 0}%
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Hardware Status: Cameras & IoT Devices */}
                   <div className="space-y-2">
@@ -774,7 +948,8 @@ export const CampusDigitalTwin3D: React.FC<CampusDigitalTwin3DProps> = ({
                     )}
                   </div>
                 </div>
-              )}
+              );
+            })()}
             </div>
           )}
         </div>

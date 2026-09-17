@@ -1,6 +1,7 @@
 import express from 'express';
 import { db, AttendanceRecord } from '../db.js';
 import { authenticateToken } from './auth.js';
+import { eventBus } from '../eventBus.js';
 import {
   matchFaceDescriptor,
   assignTrackingId,
@@ -435,6 +436,37 @@ router.post('/process-recognition', authenticateToken, (req, res) => {
             if (txResult.success) {
               attendanceMarked = true;
 
+              // Publish real-time events to Campus Event Bus
+              eventBus.publish('ATTENDANCE_RECORDED', {
+                source: 'FACE_RECOGNITION_PIPELINE',
+                classroom: activeSession.classroom,
+                sessionId: activeSession.id,
+                payload: {
+                  session_id: activeSession.id,
+                  student_id: match.student.id,
+                  student_name: match.student.full_name,
+                  roll_number: match.student.roll_number,
+                  department: match.student.department,
+                  confidence: match.confidence,
+                  classroom: activeSession.classroom,
+                  verification_method: 'FACE_RECOGNITION',
+                  timestamp: new Date().toISOString(),
+                },
+              });
+
+              eventBus.publish('FACE_VERIFIED', {
+                source: 'BIOMETRIC_ENGINE',
+                classroom: activeSession.classroom,
+                sessionId: activeSession.id,
+                payload: {
+                  student_id: match.student.id,
+                  student_name: match.student.full_name,
+                  roll_number: match.student.roll_number,
+                  confidence: match.confidence,
+                  distance: match.distance,
+                },
+              });
+
               // Trigger dynamic anomaly check if attendance threshold crossed
               setTimeout(() => {
                 try {
@@ -457,20 +489,44 @@ router.post('/process-recognition', authenticateToken, (req, res) => {
               });
             } else if (txResult.duplicate) {
               duplicateIgnored = true;
+              eventBus.publish('ATTENDANCE_DUPLICATE', {
+                source: 'IDEMPOTENCY_GUARD',
+                classroom: activeSession.classroom,
+                sessionId: activeSession.id,
+                payload: {
+                  student_id: match.student.id,
+                  roll_number: match.student.roll_number,
+                  reason: 'Student already verified present for this session',
+                },
+              });
             }
           }
         }
       }
 
       // Log recognition attempt for telemetry
+      const recognitionResult = liveness.spoofSuspected ? 'SPOOF' : match.isMatch ? 'RECOGNIZED' : 'UNKNOWN';
       db.logRecognitionEvent({
         session_id: activeSession?.id,
         student_id: match.student?.id,
         confidence: match.confidence,
         face_distance: match.distance,
         liveness_score: liveness.livenessScore,
-        result: liveness.spoofSuspected ? 'SPOOF' : match.isMatch ? 'RECOGNIZED' : 'UNKNOWN',
+        result: recognitionResult,
       });
+
+      if (!match.isMatch && activeSession) {
+        eventBus.publish('UNKNOWN_FACE', {
+          source: 'BIOMETRIC_ENGINE',
+          classroom: activeSession.classroom,
+          sessionId: activeSession.id,
+          payload: {
+            tracking_id: tracking.trackingId,
+            box: face.box,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
 
       processedResults.push({
         box: face.box,

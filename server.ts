@@ -19,6 +19,7 @@ import timetableRouter from './server/routes/timetable.js';
 import notificationsRouter from './server/routes/notifications.js';
 import analyticsRouter from './server/routes/analytics.js';
 import eventsRouter from './server/routes/events.js';
+import orchestratorRouter from './server/routes/orchestrator.js';
 import { createSignalingServer } from './server/signaling.js';
 import { createIoTGatewayServer } from './server/iotGateway.js';
 import { cyberDefenseMiddleware, CyberDefense } from './server/securityGuard.js';
@@ -124,6 +125,7 @@ async function startServer() {
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/events', eventsRouter);
+  app.use('/api/intelligence/orchestrator', orchestratorRouter);
   app.use('/api', intelligenceRouter);
   app.use('/api', settingsRouter);
 

@@ -278,7 +278,17 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       onNavigateTab?.('system');
       reply = 'Opening System Hardening and Hardware Diagnostics panel.';
     } else {
-      reply = "I don't have that data.";
+      // Delegate to Phase 41+ Command Center AI Orchestrator
+      try {
+        const aiRes = await api.askOperationalAi(cmd);
+        if (aiRes.success && aiRes.answer) {
+          reply = aiRes.answer;
+        } else {
+          reply = "I don't have that data.";
+        }
+      } catch {
+        reply = "I don't have that data.";
+      }
     }
 
     setLastResponse(reply);
